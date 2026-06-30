@@ -278,12 +278,25 @@ def admin_remove_course(key: str, crn: str = Form(...)):
     return RedirectResponse(f"/admin/{key}", status_code=303)
 
 
+def _rate_limited_broadcast(message: str, batch: int = 5, gap_seconds: int = 60) -> None:
+    """Send a broadcast in small batches (default 5 per minute) so a freshly-
+    linked WhatsApp number doesn't trip spam detection and get banned."""
+    phones = [u["phone"] for u in db.all_users() if u["active"]]
+    log.info("Broadcast start: %d users, %d every %ds", len(phones), batch, gap_seconds)
+    for i in range(0, len(phones), batch):
+        sent = sum(1 for p in phones[i:i + batch] if send_message(p, message))
+        log.info("Broadcast batch %d-%d: %d sent", i, i + batch, sent)
+        if i + batch < len(phones):
+            time.sleep(gap_seconds)
+    log.info("Broadcast complete: %d users", len(phones))
+
+
 @app.post("/admin/{key}/broadcast")
 def admin_broadcast(key: str, message: str = Form(...)):
     _check_admin(key)
-    for u in db.all_users():
-        if u["active"]:
-            send_message(u["phone"], message)
+    # Run as a background scheduler job (5/min) so the request returns instantly
+    # and the paced sending survives outside the HTTP request lifetime.
+    scheduler.add_job(_rate_limited_broadcast, args=[message], id="broadcast", replace_existing=True)
     return RedirectResponse(f"/admin/{key}", status_code=303)
 
 
