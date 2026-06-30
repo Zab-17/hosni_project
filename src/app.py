@@ -178,6 +178,10 @@ def admin_check_now(key: str):
 
 @app.post("/webhook/whatsapp")
 async def whatsapp_webhook(request: Request):
+    # Only the local Baileys bridge should call this. When a shared token is
+    # configured, require it — blocks public spoofing of inbound messages.
+    if settings.bridge_token and request.headers.get("x-bridge-token") != settings.bridge_token:
+        raise HTTPException(status_code=403)
     body = await request.json()
     phone = normalize_phone(str(body.get("from", "")))
     text = (body.get("text") or "").strip()
@@ -239,9 +243,11 @@ def _handle_command(phone: str, text: str) -> str | None:
 
 # -------------------------------------------------------------- system
 
-@app.get("/qr", response_class=HTMLResponse)
-def qr_proxy():
-    """Proxy the bridge's QR page so you can link WhatsApp via the public URL."""
+@app.get("/admin/{key}/qr", response_class=HTMLResponse)
+def qr_proxy(key: str):
+    """Proxy the bridge's QR page — gated behind the admin secret so a stranger
+    can't scan it during the unlinked window and hijack the WhatsApp account."""
+    _check_admin(key)
     try:
         r = httpx.get(f"{settings.baileys_bridge_url}/qr", timeout=10)
         return Response(content=r.text, media_type="text/html")

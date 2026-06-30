@@ -207,7 +207,10 @@ async function connectToWhatsApp() {
             try {
                 await fetch(PYTHON_WEBHOOK_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Bridge-Token': process.env.BRIDGE_TOKEN || '',
+                    },
                     body: JSON.stringify({ from, text }),
                 });
             } catch (err) {

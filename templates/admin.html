@@ -41,14 +41,14 @@
 <body>
   <h1>Seat Watcher · Admin</h1>
   <div class="muted">Active term <b>{{ term }}</b> · checks run every few minutes ·
-    <a href="/qr" target="_blank">link WhatsApp (QR)</a></div>
+    <a href="/admin/{{ key }}/qr" target="_blank">link WhatsApp (QR)</a></div>
 
   {% set h = health %}
   <div class="bar">
     {% if h and h.connected %}
       <span><span class="dot" style="background:var(--green)"></span>WhatsApp connected</span>
     {% else %}
-      <span><span class="dot" style="background:#e0533b"></span>WhatsApp NOT connected — <a href="/qr" target="_blank">scan QR</a></span>
+      <span><span class="dot" style="background:#e0533b"></span>WhatsApp NOT connected — <a href="/admin/{{ key }}/qr" target="_blank">scan QR</a></span>
     {% endif %}
     <form class="inline" method="post" action="/admin/{{ key }}/check-now">
       <button class="ghost" type="submit">Run a check now</button>

@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # --- Admin page (no login; secret slug in the URL) ---
     admin_key: str = "change-me-admin-secret"
 
+    # --- Shared secret between the Baileys bridge and this app ---
+    # If set, /webhook/whatsapp rejects any POST without this token, so the
+    # public port can't be used to spoof inbound WhatsApp messages.
+    bridge_token: str = ""
+
     # --- Poller ---
     check_interval_minutes: int = 5
 
