@@ -1,0 +1,36 @@
+# Render Blueprint — free, no credit card. Deploy: Render dashboard → New →
+# Blueprint → connect this repo. You'll be prompted for the two secret values
+# (ADMIN_KEY, BRIDGE_TOKEN). NOTE: the free disk is ephemeral; the database is
+# moved to Turso in a follow-up so users/courses persist across restarts.
+services:
+  - type: web
+    name: hosni-project
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ADMIN_KEY
+        sync: false          # set in dashboard
+      - key: BRIDGE_TOKEN
+        sync: false          # set in dashboard
+      - key: BANNER_BASE_URL
+        value: https://reg-prod.ec.aucegypt.edu
+      - key: BANNER_PATH_PREFIX
+        value: /StudentRegistrationSsb/ssb
+      - key: BANNER_TERM
+        value: "202710"
+      - key: BAILEYS_BRIDGE_URL
+        value: http://localhost:3001
+      - key: BRIDGE_PORT
+        value: "3001"
+      - key: CHECK_INTERVAL_MINUTES
+        value: "5"
+      - key: DATABASE_PATH
+        value: /app/seatwatch.db
+      - key: WA_SESSION_PATH
+        value: /app/auth_session
+      - key: PUBLIC_BASE_URL
+        value: https://hosni-project.onrender.com
