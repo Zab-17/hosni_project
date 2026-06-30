@@ -199,10 +199,10 @@ def _handle_command(phone: str, text: str) -> str | None:
     user = db.get_user(phone)
 
     if not user:
-        return (
-            "👋 Welcome to the AUC Seat Watcher!\n\n"
-            f"You're not registered yet. Sign up here:\n{settings.public_base_url}/"
-        )
+        # Policy: the bot ONLY messages numbers that exist in the database.
+        # An unregistered sender gets no reply at all (registration is web-only).
+        log.info("Ignoring inbound from unregistered number %s", phone)
+        return None
 
     if low in ("stop", "unsubscribe", "pause"):
         db.set_active(phone, False)
