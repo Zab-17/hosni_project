@@ -17,6 +17,7 @@ os.environ["DATABASE_PATH"] = os.path.join(_tmp, "test.db")
 os.environ["ADMIN_KEY"] = "secret123"
 os.environ["BANNER_TERM"] = "202710"
 os.environ["BANNER_BASE_URL"] = "https://example.test"
+os.environ["BRIDGE_TOKEN"] = ""  # disable webhook auth for the offline test
 
 from fastapi.testclient import TestClient  # noqa: E402
 
