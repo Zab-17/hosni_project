@@ -21,17 +21,26 @@ os.environ["BRIDGE_TOKEN"] = ""  # disable webhook auth for the offline test
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from src import app as appmod  # noqa: E402
 from src import database as db  # noqa: E402
 from src import poller, whatsapp_service  # noqa: E402
 from src.app import app  # noqa: E402
 
 db.init_db()
 
-# Capture outbound messages instead of hitting the bridge.
+# Capture outbound messages instead of hitting the bridge. Patch every module
+# that holds its own reference to send_message (app imports it by name).
 sent: list[tuple[str, str]] = []
-whatsapp_service.send_message = lambda phone, msg: sent.append((phone, msg)) or True
-poller.send_message = whatsapp_service.send_message
-poller.db.subscribers_for = db.subscribers_for  # ensure same module instance
+
+
+def _fake_send(phone, msg):
+    sent.append((phone, msg))
+    return True
+
+
+whatsapp_service.send_message = _fake_send
+poller.send_message = _fake_send
+appmod.send_message = _fake_send
 
 # Fake Banner: a dict we control of {crn: seats}.
 SEATS = {"12345": 0, "23456": 5}
@@ -68,6 +77,13 @@ check("second user registered", r2.status_code == 200)
 check("phone normalized to 20…", db.get_user("201010101010") is not None)
 check("two distinct courses tracked", db.counts()["courses"] == 2)
 check("three subscriptions total", db.counts()["watches"] == 3)
+
+# Registration must send a WhatsApp confirmation listing the user's courses.
+check("register sends WhatsApp confirmation with tracked courses",
+      any(p == "201010101010" and "12345" in m and "23456" in m for p, m in sent))
+
+# Isolate the alert tests from the registration confirmations above.
+sent.clear()
 
 # 2/3. First poll: 12345 is full (no alert), 23456 already open (alert once).
 poller.check_all()

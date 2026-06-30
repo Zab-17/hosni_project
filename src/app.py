@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
@@ -44,6 +44,25 @@ def normalize_phone(raw: str) -> str | None:
 def parse_crns(raw: str) -> list[str]:
     """Pull 4-6 digit course reference numbers out of free text."""
     return [m for m in re.findall(r"\d{4,6}", raw or "")]
+
+
+def registration_confirmation(name: str, phone: str) -> str:
+    """The WhatsApp confirmation sent right after a user registers — greets them
+    and lists every course they're currently tracking, which also proves their
+    WhatsApp number is reachable."""
+    rows = db.watches_for_user(phone)
+    if rows:
+        lines = "\n".join(
+            f"• CRN {r['crn']}" + (f" — {r['title']}" if r["title"] else "") for r in rows
+        )
+    else:
+        lines = "(none yet)"
+    return (
+        f"✅ You're all set, {name}!\n\n"
+        f"I'm now watching these courses for an open seat:\n{lines}\n\n"
+        f"You'll get a message right here the moment a seat opens. "
+        f"Reply *list* anytime to see your courses, or *stop <CRN>* to remove one."
+    )
 
 
 # ------------------------------------------------------------ lifespan
@@ -82,6 +101,7 @@ def register_page(request: Request):
 @app.post("/register", response_class=HTMLResponse)
 def register(
     request: Request,
+    background_tasks: BackgroundTasks,
     first_name: str = Form(...),
     last_name: str = Form(...),
     phone: str = Form(...),
@@ -104,6 +124,9 @@ def register(
     db.upsert_user(norm, first_name.strip(), last_name.strip())
     for crn in crn_list:
         db.add_watch(norm, crn, settings.banner_term)
+
+    # Confirm on WhatsApp (after the page returns) with their tracked courses.
+    background_tasks.add_task(send_message, norm, registration_confirmation(first_name.strip(), norm))
 
     return templates.TemplateResponse(
         request,
