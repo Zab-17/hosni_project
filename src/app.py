@@ -7,6 +7,8 @@ bridge (Node) runs alongside on 3001 and forwards inbound messages here.
 
 import logging
 import re
+import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 
 import httpx
@@ -44,6 +46,37 @@ def normalize_phone(raw: str) -> str | None:
 def parse_crns(raw: str) -> list[str]:
     """Pull 4-6 digit course reference numbers out of free text."""
     return [m for m in re.findall(r"\d{4,6}", raw or "")]
+
+
+def clean_name(raw: str) -> str:
+    """Sanitize a user-supplied name before it's stored or put in a WhatsApp
+    message: first line only, no URLs, letters/spaces/'-. only, capped length.
+    Stops attackers from injecting links or multi-line payloads via /register."""
+    s = (raw or "").splitlines()[0] if raw else ""
+    s = re.sub(r"https?://\S+|www\.\S+", "", s, flags=re.I)
+    s = re.sub(r"[^\w\s'\-.]", "", s, flags=re.UNICODE)
+    return s.strip()[:40] or "there"
+
+
+# Simple in-memory per-IP rate limit on registration (resets on restart). Stops
+# someone looping the public endpoint to spray WhatsApp messages at many numbers.
+_reg_hits: dict[str, list[float]] = defaultdict(list)
+_REG_MAX = 5
+_REG_WINDOW = 3600  # seconds
+
+
+def _client_ip(request: Request) -> str:
+    return request.headers.get("fly-client-ip") or (request.client.host if request.client else "unknown")
+
+
+def _rate_limited(ip: str) -> bool:
+    now = time.time()
+    hits = [t for t in _reg_hits[ip] if now - t < _REG_WINDOW]
+    _reg_hits[ip] = hits
+    if len(hits) >= _REG_MAX:
+        return True
+    hits.append(now)
+    return False
 
 
 def registration_confirmation(name: str, phone: str) -> str:
@@ -109,6 +142,7 @@ def register(
 ):
     norm = normalize_phone(phone)
     crn_list = parse_crns(crns)
+    fn, ln = clean_name(first_name), clean_name(last_name)
     if not norm or not crn_list:
         return templates.TemplateResponse(
             request,
@@ -121,12 +155,26 @@ def register(
             status_code=400,
         )
 
-    db.upsert_user(norm, first_name.strip(), last_name.strip())
+    # Throttle abuse: cap registrations per IP so the bot can't be used to spray
+    # WhatsApp messages at arbitrary numbers.
+    if _rate_limited(_client_ip(request)):
+        return templates.TemplateResponse(
+            request,
+            "register.html",
+            {
+                "term": settings.banner_term,
+                "done": False,
+                "error": "Too many sign-ups from your connection. Please try again in a little while.",
+            },
+            status_code=429,
+        )
+
+    db.upsert_user(norm, fn, ln)
     for crn in crn_list:
         db.add_watch(norm, crn, settings.banner_term)
 
     # Confirm on WhatsApp (after the page returns) with their tracked courses.
-    background_tasks.add_task(send_message, norm, registration_confirmation(first_name.strip(), norm))
+    background_tasks.add_task(send_message, norm, registration_confirmation(fn, norm))
 
     return templates.TemplateResponse(
         request,
@@ -134,7 +182,7 @@ def register(
         {
             "term": settings.banner_term,
             "done": True,
-            "name": first_name.strip(),
+            "name": fn,
             "crns": crn_list,
         },
     )
