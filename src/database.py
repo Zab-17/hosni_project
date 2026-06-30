@@ -128,6 +128,11 @@ def update_course(crn: str, term: str, seats: int, title: str | None = None) -> 
         c.commit()
 
 
+def get_course(crn: str, term: str):
+    with _connect() as c:
+        return c.execute("SELECT * FROM courses WHERE crn=? AND term=?", (crn, term)).fetchone()
+
+
 def distinct_courses() -> list[sqlite3.Row]:
     """The poller's work-list: every distinct course someone is watching."""
     with _connect() as c:
@@ -178,7 +183,7 @@ def remove_watch(phone: str, crn: str, term: str | None = None) -> None:
 def watches_for_user(phone: str) -> list[sqlite3.Row]:
     with _connect() as c:
         return c.execute(
-            """SELECT w.crn, w.term, c.title, c.last_seats
+            """SELECT w.crn, w.term, c.title, c.last_seats, c.last_checked
                FROM watch w LEFT JOIN courses c
                  ON c.crn=w.crn AND c.term=w.term
                WHERE w.phone=? ORDER BY w.crn""",

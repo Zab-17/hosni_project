@@ -78,35 +78,35 @@ check("phone normalized to 20…", db.get_user("201010101010") is not None)
 check("two distinct courses tracked", db.counts()["courses"] == 2)
 check("three subscriptions total", db.counts()["watches"] == 3)
 
-# Registration must send a WhatsApp confirmation listing the user's courses.
+# Registration confirmation lists courses WITH their just-checked seat status.
 check("register sends WhatsApp confirmation with tracked courses",
       any(p == "201010101010" and "12345" in m and "23456" in m for p, m in sent))
+check("confirmation flags an already-open course to the user",
+      any(p == "201010101010" and "23456" in m and "OPEN" in m for p, m in sent))
 
-# Isolate the alert tests from the registration confirmations above.
+# Immediate check on registration populated seats in the DB (no 5-min wait).
+check("immediate check stored open-course seats", db.get_course("23456", "202710")["last_seats"] == 5)
+check("immediate check stored full-course seats", db.get_course("12345", "202710")["last_seats"] == 0)
+check("distinct courses deduped (2 not 3)", db.counts()["courses"] == 2)
+
+# Isolate alert tests from the registration confirmations above.
 sent.clear()
 
-# 2/3. First poll: 12345 is full (no alert), 23456 already open (alert once).
+# Poll with nothing changed: open course already known, full stays full -> NO spam.
 poller.check_all()
-check("distinct check ran (no per-user duplication)", True)
-opened_first = [m for p, m in sent if "23456" in m or "COURSE 23456" in m]
-check("open course alerts on first poll", len(opened_first) >= 1)
-check("full course (12345) sent NO alert", not any("12345" in m for _, m in sent))
+check("no alerts when nothing changed (no 5-min spam)", len(sent) == 0)
 
-# Second poll, nothing changed -> NO new alerts (dedupe / no re-spam).
-before = len(sent)
-poller.check_all()
-check("no duplicate alerts when seats unchanged", len(sent) == before)
-
-# Now a seat frees on 12345 (0 -> 2). Both watchers must be alerted.
+# A seat frees on the full course 12345 (0 -> 2): BOTH watchers alerted.
 SEATS["12345"] = 2
 poller.check_all()
-alerts_12345 = [p for p, m in sent if "12345" in m]
-check("seat opening on 12345 alerts BOTH watchers", set(alerts_12345) == {"201010101010", "201020202020"})
+check("seat opening (0->open) alerts BOTH watchers",
+      set(p for p, m in sent if "12345" in m) == {"201010101010", "201020202020"})
+check("already-open course not re-alerted on poll", not any("23456" in m for p, m in sent))
 
 # Stays open -> no re-alert next poll.
-before = len(sent)
+sent.clear()
 poller.check_all()
-check("no re-alert while seat stays open", len(sent) == before)
+check("no re-alert while seat stays open", len(sent) == 0)
 
 # 4. Inbound WhatsApp commands.
 client.post("/webhook/whatsapp", json={"from": "201010101010", "text": "list"})
@@ -120,6 +120,14 @@ check("unknown user handled gracefully", unknown.status_code == 200)
 # 5. Admin gating.
 check("admin wrong key -> 404", client.get("/admin/wrong").status_code == 404)
 check("admin right key -> 200", client.get("/admin/secret123").status_code == 200)
+
+# 6. International phone numbers (not just Egyptian).
+from src.app import normalize_phone  # noqa: E402
+check("Egyptian local 01… -> 20…", normalize_phone("01154069714") == "201154069714")
+check("US +1 international kept", normalize_phone("+1 415 555 1234") == "14155551234")
+check("UAE 00971 prefix stripped", normalize_phone("0097150123456") == "97150123456")
+check("UK +44 kept", normalize_phone("+44 7911 123456") == "447911123456")
+check("garbage rejected", normalize_phone("abc") is None)
 
 print()
 if failures:

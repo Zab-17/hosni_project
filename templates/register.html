@@ -4,84 +4,164 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AUC Seat Watcher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
   <style>
-    :root { --maroon:#7d1635; --maroon-2:#a51c46; --bg:#0e0e12; --card:#1a1a22; --muted:#9aa0ab; --line:#2a2a35; }
-    * { box-sizing:border-box; }
-    body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
-           background:radial-gradient(1200px 600px at 50% -10%, #241019, var(--bg));
-           color:#f3f4f6; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; padding:20px; }
-    .card { width:100%; max-width:440px; background:var(--card); border:1px solid var(--line);
-            border-radius:18px; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.45); }
-    .badge { display:inline-block; font-size:12px; letter-spacing:.5px; text-transform:uppercase;
-             color:var(--maroon-2); font-weight:700; margin-bottom:6px; }
-    h1 { margin:0 0 6px; font-size:24px; }
-    p.sub { margin:0 0 22px; color:var(--muted); font-size:14px; line-height:1.5; }
-    label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; }
-    input { width:100%; padding:13px 14px; background:#12121a; border:1px solid var(--line);
-            border-radius:11px; color:#fff; font-size:15px; outline:none; }
-    input:focus { border-color:var(--maroon-2); }
-    .row { display:flex; gap:12px; }
-    .row > div { flex:1; }
-    small.hint { color:#6b7280; font-size:12px; }
-    button { width:100%; margin-top:22px; padding:14px; border:0; border-radius:12px; cursor:pointer;
-             background:linear-gradient(135deg,var(--maroon),var(--maroon-2)); color:#fff;
-             font-size:16px; font-weight:700; }
-    button:hover { filter:brightness(1.08); }
-    .err { background:#3b1118; border:1px solid #6e1f2c; color:#ffb4c0; padding:11px 13px;
-           border-radius:10px; font-size:13px; margin-top:16px; }
-    .ok { text-align:center; }
-    .ok .check { font-size:54px; }
-    .pill { display:inline-block; background:#12121a; border:1px solid var(--line); color:#e5e7eb;
-            border-radius:999px; padding:5px 12px; margin:4px; font-size:13px; }
-    .foot { margin-top:20px; color:#6b7280; font-size:12px; text-align:center; line-height:1.6; }
-    a { color:var(--maroon-2); }
+    :root{--navy:#041631;--surface:rgba(6,20,42,0.65);--crimson:#c41230;--gold:#d4a843;--text:#dfe6f0;--mid:#6e83a3;--dim:#34506e}
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{min-height:100%}
+    body{font-family:'Cormorant Garamond',serif;background:var(--navy);color:var(--text);display:flex;align-items:center;justify-content:center;padding:20px 0;overflow-x:hidden}
+
+    /* living background: drifting crimson/navy orbs + film grain */
+    .bg{position:fixed;inset:0;z-index:0;overflow:hidden}
+    .bg .orb{position:absolute;border-radius:50%;filter:blur(120px);opacity:.35;animation:drift 20s ease-in-out infinite alternate}
+    .bg .orb:nth-child(1){width:600px;height:600px;background:var(--crimson);top:-200px;right:-150px}
+    .bg .orb:nth-child(2){width:500px;height:500px;background:#1a3a7a;bottom:-220px;left:-120px;animation-duration:30s}
+    @keyframes drift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-20px) scale(1.03)}100%{transform:translate(-20px,30px) scale(.97)}}
+    .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.25;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")}
+
+    .wrap{position:relative;z-index:2;width:100%;max-width:440px;padding:16px}
+    .card{background:var(--surface);border:1px solid rgba(255,255,255,0.04);border-radius:20px;padding:28px 28px 24px;backdrop-filter:blur(60px);-webkit-backdrop-filter:blur(60px);box-shadow:0 1px 0 rgba(255,255,255,0.03) inset,0 40px 80px -20px rgba(0,0,0,0.5);animation:appear 1s cubic-bezier(.16,1,.3,1) both}
+    @keyframes appear{from{opacity:0;transform:translateY(30px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+    .hdr{text-align:center;margin-bottom:18px}
+    .badge{display:inline-block;padding:3px 14px;border:1px solid rgba(212,168,67,0.2);border-radius:100px;font-family:'DM Mono',monospace;font-size:9px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:14px}
+    .hdr h1{font-size:28px;font-weight:300;letter-spacing:-.5px;line-height:1.1}
+    .hdr h1 em{font-style:italic;font-weight:600;color:var(--crimson)}
+    .hdr .sub{color:var(--mid);font-family:'DM Mono',monospace;font-size:11px;font-weight:300;margin-top:8px;letter-spacing:.5px}
+    .line{height:1px;margin:18px 0;background:linear-gradient(90deg,transparent,rgba(196,18,48,0.12),transparent)}
+
+    .row{display:flex;gap:12px}
+    .row>.f{flex:1}
+    .f{margin-bottom:12px}
+    .f label{display:block;font-family:'DM Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+    .f input{width:100%;padding:12px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-radius:10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;transition:all .3s}
+    .f input::placeholder{color:var(--dim);font-family:'Cormorant Garamond',serif;font-size:14px;font-weight:300;font-style:italic}
+    .f input:focus{border-color:rgba(212,168,67,0.3);background:rgba(212,168,67,0.03);box-shadow:0 0 0 3px rgba(212,168,67,0.04)}
+    .f input.invalid{border-color:rgba(196,18,48,0.4);box-shadow:0 0 0 3px rgba(196,18,48,0.05)}
+    .f input.valid{border-color:rgba(34,197,94,0.3)}
+    .fh{font-family:'DM Mono',monospace;font-size:9px;color:var(--dim);margin-top:5px;line-height:1.7;letter-spacing:.2px}
+    .fh b{color:var(--gold);font-weight:400}
+    .pe{display:none;margin-top:5px;font-family:'DM Mono',monospace;font-size:9px;color:var(--crimson)}
+
+    .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:6px;padding:13px 24px;background:var(--crimson);color:#fff;border:none;border-radius:10px;font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600;letter-spacing:.5px;cursor:pointer;transition:all .4s cubic-bezier(.16,1,.3,1);position:relative;overflow:hidden}
+    .btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,0.08));opacity:0;transition:opacity .4s}
+    .btn:hover::before{opacity:1}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 10px 30px -8px rgba(196,18,48,0.4)}
+    .btn:active{transform:translateY(0)}
+
+    .feats{margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.03);display:grid;grid-template-columns:1fr 1fr;gap:2px}
+    .ft{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;transition:background .3s}
+    .ft:hover{background:rgba(255,255,255,0.03)}
+    .ft .i{font-size:14px;flex-shrink:0}
+    .ft span{font-family:'DM Mono',monospace;font-size:9px;color:var(--mid);letter-spacing:.2px}
+
+    .err{background:rgba(196,18,48,0.06);border:1px solid rgba(196,18,48,0.18);color:#ff9fb0;padding:10px 13px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;margin-bottom:14px;line-height:1.5}
+
+    /* done state */
+    .ok{text-align:center}
+    .check{width:72px;height:72px;margin:0 auto 20px;background:rgba(34,197,94,0.1);border:2px solid rgba(34,197,94,0.3);border-radius:50%;display:flex;align-items:center;justify-content:center;animation:pop .5s cubic-bezier(.16,1,.3,1) both}
+    .check::after{content:'✓';font-size:30px;color:#22c55e}
+    @keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+    .ok h1{font-size:24px;font-weight:300}
+    .ok h1 em{font-style:italic;font-weight:600;color:var(--crimson)}
+    .pill{display:inline-block;background:rgba(212,168,67,0.06);border:1px solid rgba(212,168,67,0.12);color:var(--text);border-radius:6px;padding:4px 11px;margin:4px 3px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px}
+    .note{font-family:'DM Mono',monospace;font-size:10px;color:var(--mid);line-height:1.7;margin-top:16px}
+    .note b{color:var(--gold);font-weight:400}
+
+    .foot{text-align:center;margin-top:16px;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:3px;text-transform:uppercase;color:var(--dim)}
+
+    @media(max-width:440px){.card{padding:24px 20px}.hdr h1{font-size:24px}.feats{grid-template-columns:1fr}.row{flex-direction:column;gap:0}}
   </style>
 </head>
 <body>
-  <div class="card">
-    {% if done %}
-      <div class="ok">
-        <div class="check">🎯</div>
-        <h1>You're all set, {{ name }}!</h1>
-        <p class="sub">We're now watching these courses for you. The moment a seat opens,
-          you'll get a WhatsApp message.</p>
-        <div>{% for c in crns %}<span class="pill">CRN {{ c }}</span>{% endfor %}</div>
-        <p class="foot">Want to add or remove courses later? Just message the bot on WhatsApp:<br>
-          <b>track 12345</b> &nbsp;·&nbsp; <b>stop 12345</b> &nbsp;·&nbsp; <b>list</b></p>
-        <button onclick="location.href='/'">Register another number</button>
-      </div>
-    {% else %}
-      <span class="badge">AUC · Banner 9</span>
-      <h1>Course Seat Watcher</h1>
-      <p class="sub">Full course? We'll watch it for you and send a WhatsApp the second a
-        seat frees up. No login, no app to install.</p>
+  <div class="bg"><div class="orb"></div><div class="orb"></div></div>
+  <div class="grain"></div>
 
-      {% if error %}<div class="err">{{ error }}</div>{% endif %}
-
-      <form method="post" action="/register">
-        <div class="row">
-          <div>
-            <label>First name</label>
-            <input name="first_name" required autocomplete="given-name" />
-          </div>
-          <div>
-            <label>Last name</label>
-            <input name="last_name" required autocomplete="family-name" />
-          </div>
+  <div class="wrap">
+    <div class="card">
+      {% if done %}
+        <div class="ok">
+          <div class="check"></div>
+          <h1>You're <em>set</em>, {{ name }}</h1>
+          <div style="margin-top:16px">{% for c in crns %}<span class="pill">CRN {{ c }}</span>{% endfor %}</div>
+          <p class="note">A WhatsApp confirmation is on its way. The moment a seat opens,
+            you'll get a message instantly.<br><br>
+            Manage anytime on WhatsApp: <b>track 12345</b> · <b>stop 12345</b> · <b>check</b></p>
+          <button class="btn" style="margin-top:20px" onclick="location.href='/'">Register another number</button>
         </div>
+      {% else %}
+        <div class="hdr">
+          <span class="badge">AUC · Banner 9</span>
+          <h1>Never miss a <em>seat</em></h1>
+          <p class="sub">WhatsApp alerts the second a course opens up</p>
+        </div>
+        <div class="line"></div>
 
-        <label>WhatsApp number</label>
-        <input name="phone" required inputmode="tel" placeholder="01XXXXXXXXX or +20…" />
-        <small class="hint">Include country code, or just your Egyptian 01… number.</small>
+        {% if error %}<div class="err">{{ error }}</div>{% endif %}
 
-        <label>Course numbers (CRNs)</label>
-        <input name="crns" required inputmode="numeric" placeholder="e.g. 12345, 23456, 34512" />
-        <small class="hint">Separate multiple courses with commas or spaces.</small>
+        <form method="post" action="/register" id="form" onsubmit="return validate()">
+          <div class="row">
+            <div class="f">
+              <label>First name</label>
+              <input name="first_name" required autocomplete="given-name" />
+            </div>
+            <div class="f">
+              <label>Last name</label>
+              <input name="last_name" required autocomplete="family-name" />
+            </div>
+          </div>
 
-        <button type="submit">Watch my courses →</button>
-      </form>
-      <p class="foot">Term: {{ term }} &nbsp;·&nbsp; You can track as many courses as you like.</p>
-    {% endif %}
+          <div class="f">
+            <label>WhatsApp number</label>
+            <input name="phone" id="phone" required inputmode="tel" placeholder="201001234567" />
+            <p class="fh">Include your <b>country code</b> — e.g. <b>20</b> Egypt, <b>1</b> US, <b>971</b> UAE, <b>44</b> UK. An Egyptian <b>01…</b> number also works.</p>
+            <p class="pe" id="pe"></p>
+          </div>
+
+          <div class="f">
+            <label>Course numbers (CRNs)</label>
+            <input name="crns" required inputmode="numeric" placeholder="12161, 23456, 34512" />
+            <p class="fh">Separate multiple courses with commas. Track as many as you like.</p>
+          </div>
+
+          <button class="btn" type="submit">Watch my courses →</button>
+
+          <div class="feats">
+            <div class="ft"><span class="i">🔔</span><span>Instant WhatsApp alert</span></div>
+            <div class="ft"><span class="i">🎯</span><span>Any AUC course</span></div>
+            <div class="ft"><span class="i">♾️</span><span>Unlimited courses</span></div>
+            <div class="ft"><span class="i">⚡</span><span>Re-checked constantly</span></div>
+          </div>
+        </form>
+        <div class="foot">Term {{ term }}</div>
+      {% endif %}
+    </div>
   </div>
+
+  <script>
+    function validate(){
+      var el = document.getElementById('phone');
+      var pe = document.getElementById('pe');
+      var p = el.value.replace(/[\s+\-]/g, '').trim();
+      if (p.charAt(0) === '+') p = p.substring(1);
+      if (!/^\d{7,15}$/.test(p)) {
+        el.classList.add('invalid'); el.classList.remove('valid');
+        pe.style.display = 'block';
+        pe.textContent = 'Enter country code + number (7–15 digits)';
+        return false;
+      }
+      el.classList.remove('invalid'); el.classList.add('valid'); pe.style.display='none';
+      return true;
+    }
+    var ph = document.getElementById('phone');
+    if (ph) ph.addEventListener('input', function(){
+      var v = this.value.replace(/[^0-9]/g,'');
+      this.classList.remove('invalid','valid');
+      document.getElementById('pe').style.display='none';
+      if (v.length >= 7 && v.length <= 15) this.classList.add('valid');
+    });
+  </script>
 </body>
 </html>

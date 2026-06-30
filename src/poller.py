@@ -38,6 +38,22 @@ def _alert_text(crn: str, term: str, info: dict) -> str:
     )
 
 
+def check_courses(crns: list[str], term: str) -> None:
+    """Check specific CRNs right now and store their seat counts — called when a
+    user registers or adds a course, so the data is in the database immediately
+    and a 'check' command can answer without waiting for the 5-minute poll.
+    Skips any CRN already checked (don't re-hit Banner for a popular course)."""
+    client = BannerClient()
+    for crn in crns:
+        course = db.get_course(crn, term)
+        if course is not None and course["last_checked"] is not None:
+            continue
+        info = client.get_seats(crn, term)
+        if info:
+            db.update_course(crn, term, info["seats"], title=info["title"])
+            log.info("Immediate check CRN %s: %d seats available", crn, info["seats"])
+
+
 def check_all() -> None:
     courses = db.distinct_courses()
     if not courses:

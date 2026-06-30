@@ -10,6 +10,7 @@ import re
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -20,7 +21,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import database as db
 from .config import settings
-from .poller import check_all
+from .poller import check_all, check_courses
 from .whatsapp_service import bridge_health, send_message
 
 logging.basicConfig(level=logging.INFO)
@@ -33,19 +34,40 @@ scheduler = BackgroundScheduler(timezone="UTC")
 # ------------------------------------------------------------- helpers
 
 def normalize_phone(raw: str) -> str | None:
-    """Return E.164 digits (no +) or None if it doesn't look like a phone.
-    Egyptian convenience: a leading 0 on an 11-digit local number becomes 20."""
+    """Normalize any INTERNATIONAL number to bare E.164 digits (country code +
+    number, no +). Matches canvas-reminder: strip spaces/+/-, require 7-15 digits.
+    Conveniences that don't affect properly-entered international numbers:
+      - a leading '00' international prefix is dropped (00<cc>... -> <cc>...)
+      - a local Egyptian mobile '01XXXXXXXXX' (11 digits) becomes '20XXXXXXXXX'
+    A foreign number entered with its own country code (no leading 0) is kept
+    as-is, so US 1415..., UK 44..., UAE 971..., etc. all work."""
     digits = re.sub(r"\D", "", raw or "")
     if digits.startswith("00"):
         digits = digits[2:]
-    if len(digits) == 11 and digits.startswith("0"):
-        digits = "20" + digits[1:]  # 01xxxxxxxxx -> 201xxxxxxxxx
+    if len(digits) == 11 and digits.startswith("01"):
+        digits = "20" + digits[1:]  # Egyptian local mobile -> E.164
     return digits if re.fullmatch(r"\d{7,15}", digits) else None
 
 
 def parse_crns(raw: str) -> list[str]:
     """Pull 4-6 digit course reference numbers out of free text."""
     return [m for m in re.findall(r"\d{4,6}", raw or "")]
+
+
+def _ago(iso: str) -> str:
+    """Human 'time since' for the last-check timestamp (e.g. '3 min ago')."""
+    try:
+        t = datetime.fromisoformat(iso)
+        if t.tzinfo is None:
+            t = t.replace(tzinfo=timezone.utc)
+        secs = (datetime.now(timezone.utc) - t).total_seconds()
+    except (ValueError, TypeError):
+        return "recently"
+    if secs < 60:
+        return "just now"
+    if secs < 3600:
+        return f"{int(secs // 60)} min ago"
+    return f"{int(secs // 3600)} h ago"
 
 
 def clean_name(raw: str) -> str:
@@ -79,22 +101,36 @@ def _rate_limited(ip: str) -> bool:
     return False
 
 
+def _finish_registration(phone: str, name: str, crns: list[str], term: str) -> None:
+    """Runs after the page returns: populate seats for the new courses, then
+    confirm on WhatsApp (so the confirmation shows current availability)."""
+    check_courses(crns, term)
+    send_message(phone, registration_confirmation(name, phone))
+
+
 def registration_confirmation(name: str, phone: str) -> str:
     """The WhatsApp confirmation sent right after a user registers — greets them
     and lists every course they're currently tracking, which also proves their
     WhatsApp number is reachable."""
     rows = db.watches_for_user(phone)
-    if rows:
-        lines = "\n".join(
-            f"• CRN {r['crn']}" + (f" — {r['title']}" if r["title"] else "") for r in rows
-        )
-    else:
-        lines = "(none yet)"
+    parts, open_now = [], False
+    for r in rows:
+        seats = r["last_seats"]
+        title = r["title"] or f"CRN {r['crn']}"
+        if seats is None:
+            parts.append(f"• {r['crn']} — {title}: ⏳ checking…")
+        elif seats > 0:
+            open_now = True
+            parts.append(f"• {r['crn']} — {title}: ✅ {seats} seat(s) OPEN now!")
+        else:
+            parts.append(f"• {r['crn']} — {title}: ❌ full")
+    body = "\n".join(parts) if parts else "(none yet)"
+    tail = ("\n\n🔥 Seats are open right now — go register fast!" if open_now
+            else "\n\nI'll message you the moment a seat opens.")
     return (
         f"✅ You're all set, {name}!\n\n"
-        f"I'm now watching these courses for an open seat:\n{lines}\n\n"
-        f"You'll get a message right here the moment a seat opens. "
-        f"Reply *list* anytime to see your courses, or *stop <CRN>* to remove one."
+        f"Watching for you:\n{body}{tail}\n\n"
+        f"Reply *check* anytime for the latest, or *stop <CRN>* to remove one."
     )
 
 
@@ -173,8 +209,10 @@ def register(
     for crn in crn_list:
         db.add_watch(norm, crn, settings.banner_term)
 
-    # Confirm on WhatsApp (after the page returns) with their tracked courses.
-    background_tasks.add_task(send_message, norm, registration_confirmation(fn, norm))
+    # After the page returns: check the new courses live so their seats land in
+    # the DB immediately (a 'check' works at once), THEN send the confirmation
+    # reflecting those seats.
+    background_tasks.add_task(_finish_registration, norm, fn, crn_list, settings.banner_term)
 
     return templates.TemplateResponse(
         request,
@@ -248,7 +286,7 @@ def admin_check_now(key: str):
 # --------------------------------------------- inbound WhatsApp webhook
 
 @app.post("/webhook/whatsapp")
-async def whatsapp_webhook(request: Request):
+async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
     # Only the local Baileys bridge should call this. When a shared token is
     # configured, require it — blocks public spoofing of inbound messages.
     if settings.bridge_token and request.headers.get("x-bridge-token") != settings.bridge_token:
@@ -259,13 +297,13 @@ async def whatsapp_webhook(request: Request):
     if not phone or not text:
         return {"ok": True}
 
-    reply = _handle_command(phone, text)
+    reply = _handle_command(phone, text, background_tasks)
     if reply:
         send_message(phone, reply)
     return {"ok": True}
 
 
-def _handle_command(phone: str, text: str) -> str | None:
+def _handle_command(phone: str, text: str, background_tasks: BackgroundTasks) -> str | None:
     low = text.lower().strip()
     user = db.get_user(phone)
 
@@ -281,16 +319,26 @@ def _handle_command(phone: str, text: str) -> str | None:
     if low in ("start", "resume"):
         db.set_active(phone, True)
         return "🔔 Resumed — you'll be alerted when a seat opens."
-    if low in ("list", "courses", "status"):
+    if low in ("list", "courses", "status", "check", "seats", "available"):
+        # Always answer from the LAST stored check (courses.last_seats) — never a
+        # live Banner hit, so 500 users asking at once can't hammer the portal.
         rows = db.watches_for_user(phone)
         if not rows:
             return "You're not tracking any courses. Reply 'track <CRN>' to add one."
-        lines = [
-            f"• {r['crn']} — {(r['title'] or 'pending first check')} "
-            f"({'OPEN ' + str(r['last_seats']) if (r['last_seats'] or 0) > 0 else 'full/—'})"
-            for r in rows
-        ]
-        return "📋 You're tracking:\n" + "\n".join(lines)
+        checks = [r["last_checked"] for r in rows if r["last_checked"]]
+        when = _ago(max(checks)) if checks else "not checked yet"
+        lines = []
+        for r in rows:
+            seats = r["last_seats"]
+            title = r["title"] or "pending first check"
+            if seats is None:
+                state = "⏳ not checked yet"
+            elif seats > 0:
+                state = f"✅ {seats} seat(s) available"
+            else:
+                state = "❌ full"
+            lines.append(f"• {r['crn']} — {title}: {state}")
+        return f"📋 Your courses (as of last check, {when}):\n" + "\n".join(lines)
 
     m = re.match(r"(?:stop|remove|untrack)\s+(\d{4,6})", low)
     if m:
@@ -301,6 +349,8 @@ def _handle_command(phone: str, text: str) -> str | None:
     if crns:
         for crn in crns:
             db.add_watch(phone, crn, settings.banner_term)
+        # Check the new courses immediately so a follow-up 'check' has data.
+        background_tasks.add_task(check_courses, crns, settings.banner_term)
         return f"✅ Now tracking: {', '.join(crns)}. I'll text you the moment a seat opens."
 
     return (
