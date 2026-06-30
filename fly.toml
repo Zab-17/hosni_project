@@ -1,32 +1,35 @@
-app = 'auc-seat-watcher'
-primary_region = 'fra'
+# fly.toml app configuration file generated for hosni-project on 2026-06-30T13:18:21Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'hosni-project'
+primary_region = 'ams'
 
 [build]
 
+[env]
+  BAILEYS_BRIDGE_URL = 'http://localhost:3001'
+  BANNER_PATH_PREFIX = '/StudentRegistrationSsb/ssb'
+  BANNER_TERM = '202710'
+  BRIDGE_PORT = '3001'
+  CHECK_INTERVAL_MINUTES = '5'
+  DATABASE_PATH = '/data/seatwatch.db'
+  PUBLIC_BASE_URL = 'https://auc-seat-watcher.fly.dev'
+  PYTHON_WEBHOOK_URL = 'http://localhost:8000/webhook/whatsapp'
+  WA_SESSION_PATH = '/data/wa_session'
+
+[[mounts]]
+  source = 'seatwatch_data'
+  destination = '/data'
+
 [http_service]
-  internal_port = 8000
+  internal_port = 8080
   force_https = true
-  auto_stop_machines = 'off'     # scheduler must keep running
+  auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 1
 
-[env]
-  # Non-secret config. Secrets (ADMIN_KEY, BANNER_BASE_URL) go via:
-  #   fly secrets set ADMIN_KEY=... BANNER_BASE_URL=...
-  BANNER_PATH_PREFIX = '/StudentRegistrationSsb/ssb'
-  BANNER_TERM = '202710'
-  CHECK_INTERVAL_MINUTES = '5'
-  BAILEYS_BRIDGE_URL = 'http://localhost:3001'
-  BRIDGE_PORT = '3001'
-  PYTHON_WEBHOOK_URL = 'http://localhost:8000/webhook/whatsapp'
-  WA_SESSION_PATH = '/data/wa_session'
-  DATABASE_PATH = '/data/seatwatch.db'
-  PUBLIC_BASE_URL = 'https://auc-seat-watcher.fly.dev'
-
 [[vm]]
   size = 'shared-cpu-1x'
-  memory = '2048mb'   # max for free shared-cpu-1x
-
-[mounts]
-  source = 'seatwatch_data'
-  destination = '/data'
+  memory = '2048mb'
