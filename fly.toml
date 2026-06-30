@@ -25,7 +25,7 @@ primary_region = 'ams'
 
 [[vm]]
   size = 'shared-cpu-1x'
-  memory = '2048mb'   # max for free shared-cpu-1x
+  memory = '512mb'   # app uses ~250MB; 512 is safe + cheap (~$3.5/mo)
 
 [mounts]
   source = 'seatwatch_data'
