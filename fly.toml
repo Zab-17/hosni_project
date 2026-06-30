@@ -1,0 +1,32 @@
+app = 'auc-seat-watcher'
+primary_region = 'fra'
+
+[build]
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = 'off'     # scheduler must keep running
+  auto_start_machines = true
+  min_machines_running = 1
+
+[env]
+  # Non-secret config. Secrets (ADMIN_KEY, BANNER_BASE_URL) go via:
+  #   fly secrets set ADMIN_KEY=... BANNER_BASE_URL=...
+  BANNER_PATH_PREFIX = '/StudentRegistrationSsb/ssb'
+  BANNER_TERM = '202710'
+  CHECK_INTERVAL_MINUTES = '5'
+  BAILEYS_BRIDGE_URL = 'http://localhost:3001'
+  BRIDGE_PORT = '3001'
+  PYTHON_WEBHOOK_URL = 'http://localhost:8000/webhook/whatsapp'
+  WA_SESSION_PATH = '/data/wa_session'
+  DATABASE_PATH = '/data/seatwatch.db'
+  PUBLIC_BASE_URL = 'https://auc-seat-watcher.fly.dev'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '2048mb'   # max for free shared-cpu-1x
+
+[mounts]
+  source = 'seatwatch_data'
+  destination = '/data'

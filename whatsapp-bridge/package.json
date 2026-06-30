@@ -1,0 +1,17 @@
+{
+  "name": "whatsapp-bridge",
+  "version": "2.0.0",
+  "description": "WhatsApp bridge for Canvas Reminder (Baileys)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.16",
+    "express": "^4.21.0",
+    "node-cache": "^5.1.2",
+    "pino": "^9.0.0",
+    "qrcode": "^1.5.4"
+  }
+}

@@ -1,0 +1,17 @@
+# Keep the build context tiny (lesson from canvas-reminder: node_modules alone
+# is ~280MB and makes deploys take minutes). Everything heavy is rebuilt or
+# mounted at runtime.
+node_modules
+whatsapp-bridge/node_modules
+auth_session
+wa_session
+__pycache__
+*.pyc
+venv
+.venv
+.git
+.env
+*.db
+*.db-shm
+*.db-wal
+.DS_Store

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Seat Watcher · Admin</title>
+  <style>
+    :root { --bg:#0c0c10; --card:#16161d; --line:#262630; --muted:#9aa0ab; --accent:#a51c46; --green:#2fbf71; --amber:#e0a93b; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:#eef0f3;
+           font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; padding:24px; }
+    h1 { margin:0 0 4px; font-size:22px; }
+    .muted { color:var(--muted); font-size:13px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin:18px 0; }
+    .stat { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+    .stat b { font-size:26px; display:block; }
+    .stat span { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.4px; }
+    .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:6px 0 22px; }
+    .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:6px; }
+    section { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px; margin-bottom:18px; }
+    section h2 { margin:0 0 12px; font-size:15px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th,td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); }
+    th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.3px; }
+    .tag { padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; }
+    .open { background:#10331f; color:var(--green); }
+    .full { background:#33270f; color:var(--amber); }
+    .pending { background:#1f1f29; color:var(--muted); }
+    input,button,textarea { font-family:inherit; }
+    input,textarea { background:#101017; border:1px solid var(--line); color:#fff; border-radius:9px; padding:9px 11px; font-size:13px; }
+    button { background:var(--accent); color:#fff; border:0; border-radius:9px; padding:9px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+    button.ghost { background:#222230; }
+    button.danger { background:#3b1118; color:#ffb4c0; }
+    form.inline { display:inline; }
+    .tools { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+    .tools .f { display:flex; flex-direction:column; gap:5px; }
+    .tools label { font-size:11px; color:var(--muted); }
+    a { color:var(--accent); }
+  </style>
+</head>
+<body>
+  <h1>Seat Watcher · Admin</h1>
+  <div class="muted">Active term <b>{{ term }}</b> · checks run every few minutes ·
+    <a href="/qr" target="_blank">link WhatsApp (QR)</a></div>
+
+  {% set h = health %}
+  <div class="bar">
+    {% if h and h.connected %}
+      <span><span class="dot" style="background:var(--green)"></span>WhatsApp connected</span>
+    {% else %}
+      <span><span class="dot" style="background:#e0533b"></span>WhatsApp NOT connected — <a href="/qr" target="_blank">scan QR</a></span>
+    {% endif %}
+    <form class="inline" method="post" action="/admin/{{ key }}/check-now">
+      <button class="ghost" type="submit">Run a check now</button>
+    </form>
+  </div>
+
+  <div class="grid">
+    <div class="stat"><b>{{ stats.users }}</b><span>Users</span></div>
+    <div class="stat"><b>{{ stats.courses }}</b><span>Distinct courses</span></div>
+    <div class="stat"><b>{{ stats.watches }}</b><span>Subscriptions</span></div>
+  </div>
+
+  <section>
+    <h2>Courses being watched ({{ courses|length }})</h2>
+    <table>
+      <tr><th>CRN</th><th>Title</th><th>Seats</th><th>Watchers</th><th>Last checked</th></tr>
+      {% for c in courses %}
+      <tr>
+        <td><b>{{ c.crn }}</b></td>
+        <td>{{ c.title or '—' }}</td>
+        <td>
+          {% if c.last_seats is none %}<span class="tag pending">pending</span>
+          {% elif c.last_seats > 0 %}<span class="tag open">{{ c.last_seats }} open</span>
+          {% else %}<span class="tag full">full</span>{% endif %}
+        </td>
+        <td>{{ c.watcher_count }}</td>
+        <td class="muted">{{ (c.last_checked or '—')[:16].replace('T',' ') }}</td>
+      </tr>
+      {% endfor %}
+      {% if not courses %}<tr><td colspan="5" class="muted">Nobody is watching anything yet.</td></tr>{% endif %}
+    </table>
+  </section>
+
+  <section>
+    <h2>Users ({{ users|length }})</h2>
+    <table>
+      <tr><th>Name</th><th>Phone</th><th>Courses</th><th>Status</th><th></th></tr>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.first_name }} {{ u.last_name }}</td>
+        <td>{{ u.phone }}</td>
+        <td>{{ u.course_count }}</td>
+        <td>{% if u.active %}<span class="tag open">active</span>{% else %}<span class="tag full">paused</span>{% endif %}</td>
+        <td>
+          <form class="inline" method="post" action="/admin/{{ key }}/delete-user"
+                onsubmit="return confirm('Delete {{ u.phone }} and all their watches?')">
+            <input type="hidden" name="phone" value="{{ u.phone }}" />
+            <button class="danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not users %}<tr><td colspan="5" class="muted">No users yet.</td></tr>{% endif %}
+    </table>
+  </section>
+
+  <section>
+    <h2>Tools</h2>
+    <div class="tools">
+      <form class="tools" method="post" action="/admin/{{ key }}/add-course">
+        <div class="f"><label>Phone</label><input name="phone" placeholder="2011…" required /></div>
+        <div class="f"><label>CRN(s)</label><input name="crns" placeholder="12345, 23456" required /></div>
+        <button type="submit">Add course to user</button>
+      </form>
+    </div>
+    <form method="post" action="/admin/{{ key }}/broadcast" style="margin-top:14px"
+          onsubmit="return confirm('Send this message to ALL active users?')">
+      <label class="muted">Broadcast a WhatsApp message to every active user</label><br>
+      <textarea name="message" rows="2" style="width:100%; margin-top:6px" required placeholder="Heads up: …"></textarea>
+      <button type="submit" style="margin-top:8px">Broadcast</button>
+    </form>
+  </section>
+</body>
+</html>
