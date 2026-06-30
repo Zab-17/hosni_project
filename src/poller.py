@@ -33,8 +33,7 @@ def _alert_text(crn: str, term: str, info: dict) -> str:
         f"{title}\n"
         f"CRN: {crn}  |  Term: {term}\n"
         f"Seats available: {info['seats']} / {info['max']}\n\n"
-        f"Register NOW before it fills:\n{_registration_link(term)}\n\n"
-        f"_Reply 'stop {crn}' to stop tracking this course._"
+        f"Register NOW before it fills:\n{_registration_link(term)}"
     )
 
 

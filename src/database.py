@@ -145,6 +145,15 @@ def distinct_courses() -> list[sqlite3.Row]:
         ).fetchall()
 
 
+def remove_course(crn: str, term: str) -> None:
+    """Remove a course entirely — every watch on it and the course row itself.
+    Used by admin to purge a bad/invalid CRN for everyone."""
+    with _lock, _connect() as c:
+        c.execute("DELETE FROM watch WHERE crn=? AND term=?", (crn, term))
+        c.execute("DELETE FROM courses WHERE crn=? AND term=?", (crn, term))
+        c.commit()
+
+
 def _prune_orphan_courses() -> None:
     """Drop courses nobody watches anymore so we stop checking them."""
     with _lock, _connect() as c:

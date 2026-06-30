@@ -11,8 +11,20 @@ import httpx
 
 from .config import settings
 
+# Appended to every outbound message so the user always sees what they can do.
+COMMAND_FOOTER = (
+    "\n\n— — — — —\n"
+    "💬 *Reply anytime:*\n"
+    "• *add <CRN>* — watch a course\n"
+    "• *remove <CRN>* — stop watching one\n"
+    "• *check* — your courses & seats\n"
+    "• *stop* / *start* — pause / resume alerts"
+)
 
-def send_message(phone: str, message: str) -> bool:
+
+def send_message(phone: str, message: str, footer: bool = True) -> bool:
+    if footer and "Reply anytime" not in message:
+        message = message + COMMAND_FOOTER
     url = f"{settings.baileys_bridge_url}/send"
     body = {"to": phone, "message": message}
 

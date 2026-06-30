@@ -21,6 +21,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import database as db
 from .config import settings
+from .banner_service import BannerClient
 from .poller import check_all, check_courses
 from .whatsapp_service import bridge_health, send_message
 
@@ -129,8 +130,7 @@ def registration_confirmation(name: str, phone: str) -> str:
             else "\n\nI'll message you the moment a seat opens.")
     return (
         f"✅ You're all set, {name}!\n\n"
-        f"Watching for you:\n{body}{tail}\n\n"
-        f"Reply *check* anytime for the latest, or *stop <CRN>* to remove one."
+        f"Watching for you:\n{body}{tail}"
     )
 
 
@@ -147,6 +147,10 @@ async def lifespan(app: FastAPI):
         coalesce=True,
         replace_existing=True,
     )
+    # Run one check right away on boot so courses don't sit "pending" for up to
+    # check_interval_minutes after a (re)start.
+    scheduler.add_job(check_all, "date", run_date=datetime.now(timezone.utc),
+                      id="startup_check", replace_existing=True)
     scheduler.start()
     log.info("Scheduler started — checking every %d min.", settings.check_interval_minutes)
     yield
@@ -267,6 +271,13 @@ def admin_add_course(key: str, phone: str = Form(...), crns: str = Form(...)):
     return RedirectResponse(f"/admin/{key}", status_code=303)
 
 
+@app.post("/admin/{key}/remove-course")
+def admin_remove_course(key: str, crn: str = Form(...)):
+    _check_admin(key)
+    db.remove_course(crn.strip(), settings.banner_term)
+    return RedirectResponse(f"/admin/{key}", status_code=303)
+
+
 @app.post("/admin/{key}/broadcast")
 def admin_broadcast(key: str, message: str = Form(...)):
     _check_admin(key)
@@ -286,7 +297,7 @@ def admin_check_now(key: str):
 # --------------------------------------------- inbound WhatsApp webhook
 
 @app.post("/webhook/whatsapp")
-async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
+async def whatsapp_webhook(request: Request):
     # Only the local Baileys bridge should call this. When a shared token is
     # configured, require it — blocks public spoofing of inbound messages.
     if settings.bridge_token and request.headers.get("x-bridge-token") != settings.bridge_token:
@@ -297,13 +308,13 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
     if not phone or not text:
         return {"ok": True}
 
-    reply = _handle_command(phone, text, background_tasks)
+    reply = _handle_command(phone, text)
     if reply:
         send_message(phone, reply)
     return {"ok": True}
 
 
-def _handle_command(phone: str, text: str, background_tasks: BackgroundTasks) -> str | None:
+def _handle_command(phone: str, text: str) -> str | None:
     low = text.lower().strip()
     user = db.get_user(phone)
 
@@ -319,47 +330,61 @@ def _handle_command(phone: str, text: str, background_tasks: BackgroundTasks) ->
     if low in ("start", "resume"):
         db.set_active(phone, True)
         return "🔔 Resumed — you'll be alerted when a seat opens."
-    if low in ("list", "courses", "status", "check", "seats", "available"):
-        # Always answer from the LAST stored check (courses.last_seats) — never a
-        # live Banner hit, so 500 users asking at once can't hammer the portal.
+
+    if low in ("list", "courses", "status", "check", "seats", "available", "my courses"):
+        # Answer from the LAST stored check (courses.last_seats) — never a live
+        # Banner hit, so many users asking at once can't hammer the portal.
         rows = db.watches_for_user(phone)
         if not rows:
-            return "You're not tracking any courses. Reply 'track <CRN>' to add one."
-        checks = [r["last_checked"] for r in rows if r["last_checked"]]
-        when = _ago(max(checks)) if checks else "not checked yet"
+            return "You're not tracking any courses. Send 'add <CRN>' to start."
         lines = []
         for r in rows:
             seats = r["last_seats"]
-            title = r["title"] or "pending first check"
+            title = r["title"] or f"CRN {r['crn']}"
             if seats is None:
-                state = "⏳ not checked yet"
+                state = "⏳ checking…"
             elif seats > 0:
-                state = f"✅ {seats} seat(s) available"
+                state = f"✅ {seats} seat(s) open"
             else:
                 state = "❌ full"
             lines.append(f"• {r['crn']} — {title}: {state}")
-        return f"📋 Your courses (as of last check, {when}):\n" + "\n".join(lines)
+        return "📋 Your courses:\n" + "\n".join(lines)
 
-    m = re.match(r"(?:stop|remove|untrack)\s+(\d{4,6})", low)
-    if m:
-        db.remove_watch(phone, m.group(1))
-        return f"🗑️ Stopped tracking CRN {m.group(1)}."
+    # Remove: 'remove/stop/untrack/delete/drop <CRN> [more...]'
+    if re.match(r"^(remove|stop|untrack|delete|drop)\b", low):
+        crns = parse_crns(low)
+        if not crns:
+            return "Which course? e.g. 'remove 12345'."
+        for crn in crns:
+            db.remove_watch(phone, crn)
+        return f"🗑️ Stopped tracking: {', '.join(crns)}."
 
+    # Add: 'add/track <CRN>' or a bare CRN. Check Banner now so we confirm it
+    # exists, report current seats, and reject CRNs Banner can't read.
     crns = parse_crns(low)
     if crns:
+        client = BannerClient()
+        out = []
         for crn in crns:
+            course = db.get_course(crn, settings.banner_term)
+            if course is not None and course["last_checked"] is not None:
+                seats, title = course["last_seats"], course["title"]
+            else:
+                info = client.get_seats(crn, settings.banner_term)
+                if info is None:
+                    out.append(f"⚠️ {crn} — couldn't read this CRN from Banner. Double-check the number.")
+                    continue
+                db.update_course(crn, settings.banner_term, info["seats"], title=info["title"])
+                seats, title = info["seats"], info["title"]
             db.add_watch(phone, crn, settings.banner_term)
-        # Check the new courses immediately so a follow-up 'check' has data.
-        background_tasks.add_task(check_courses, crns, settings.banner_term)
-        return f"✅ Now tracking: {', '.join(crns)}. I'll text you the moment a seat opens."
+            label = title or f"CRN {crn}"
+            if seats and seats > 0:
+                out.append(f"✅ {crn} — {label}: {seats} seat(s) OPEN now!")
+            else:
+                out.append(f"➕ {crn} — {label}: full — I'll alert you the moment a seat opens.")
+        return "\n".join(out)
 
-    return (
-        "Commands:\n"
-        "• <CRN> or 'track <CRN>' — start watching a course\n"
-        "• 'stop <CRN>' — stop watching one\n"
-        "• 'list' — see your courses\n"
-        "• 'stop' / 'start' — pause or resume all alerts"
-    )
+    return "🤔 I didn't catch that — try one of these:"
 
 
 # -------------------------------------------------------------- system

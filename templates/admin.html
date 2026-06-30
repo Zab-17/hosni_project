@@ -128,6 +128,11 @@
         <div class="fld"><label>CRN(s)</label><input name="crns" placeholder="12345, 23456" required /></div>
         <button type="submit">Add course to user</button>
       </form>
+      <form class="tools" method="post" action="/admin/{{ key }}/remove-course" style="margin-top:12px"
+            onsubmit="return confirm('Remove this CRN for ALL users?')">
+        <div class="fld"><label>Remove CRN (everyone)</label><input name="crn" placeholder="17432" required /></div>
+        <button class="danger" type="submit">Remove course</button>
+      </form>
       <form method="post" action="/admin/{{ key }}/broadcast" style="margin-top:14px"
             onsubmit="return confirm('Send this message to ALL active users?')">
         <label class="sub">Broadcast a WhatsApp message to every active user</label><br>

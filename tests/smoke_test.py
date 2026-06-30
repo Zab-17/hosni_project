@@ -43,7 +43,7 @@ poller.send_message = _fake_send
 appmod.send_message = _fake_send
 
 # Fake Banner: a dict we control of {crn: seats}.
-SEATS = {"12345": 0, "23456": 5}
+SEATS = {"12345": 0, "23456": 5, "34567": 7}
 
 
 class FakeBanner:
@@ -55,6 +55,7 @@ class FakeBanner:
 
 
 poller.BannerClient = FakeBanner
+appmod.BannerClient = FakeBanner  # the add command checks Banner via app's reference
 
 client = TestClient(app)
 failures = []
