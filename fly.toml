@@ -1,5 +1,5 @@
-app = 'auc-seat-watcher'
-primary_region = 'fra'
+app = 'hosni-project'
+primary_region = 'ams'
 
 [build]
 
@@ -21,7 +21,7 @@ primary_region = 'fra'
   PYTHON_WEBHOOK_URL = 'http://localhost:8000/webhook/whatsapp'
   WA_SESSION_PATH = '/data/wa_session'
   DATABASE_PATH = '/data/seatwatch.db'
-  PUBLIC_BASE_URL = 'https://auc-seat-watcher.fly.dev'
+  PUBLIC_BASE_URL = 'https://hosni-project.fly.dev'
 
 [[vm]]
   size = 'shared-cpu-1x'
