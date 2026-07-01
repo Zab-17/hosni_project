@@ -77,9 +77,10 @@
         </div>
         {% endfor %}
         {% if not courses %}<p class="note">You're not watching any courses yet.</p>{% endif %}
+        <a class="btn" href="{{ banner_url }}" target="_blank" rel="noopener" style="text-decoration:none">🎓 Go to AUC Banner — Browse & Register →</a>
         <p class="note">🔔 No need to check — we message you the moment a seat opens.<br>
           Add or remove courses on WhatsApp: <b>add 12345</b> · <b>remove 12345</b></p>
-        <button class="btn" onclick="location.href='/me'">Look up another number</button>
+        <button class="btn" style="background:#1e3354;margin-top:10px" onclick="location.href='/me'">Look up another number</button>
       {% else %}
         <div class="hdr">
           <span class="badge">AUC · Seat Watcher</span>

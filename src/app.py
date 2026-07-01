@@ -293,9 +293,11 @@ def my_courses(request: Request, phone: str = Form(...)):
             status_code=404,
         )
     courses = [_course_view(r) for r in db.watches_for_user(norm)]
+    banner_url = settings.banner_base_url.rstrip("/") + settings.banner_path_prefix + "/classSearch/classSearch"
     return templates.TemplateResponse(
         request, "me.html",
-        {"done": True, "name": user["first_name"], "courses": courses, "active": bool(user["active"])},
+        {"done": True, "name": user["first_name"], "courses": courses,
+         "active": bool(user["active"]), "banner_url": banner_url},
     )
 
 
