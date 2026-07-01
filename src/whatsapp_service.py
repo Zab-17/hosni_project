@@ -11,12 +11,12 @@ import httpx
 
 from .config import settings
 
-# Appended to every outbound message: the link to view all their courses,
-# plus the two main actions.
+# Appended to every outbound message. The bot is send-only, so this just points
+# users to their page — where they view, add, and remove courses.
 COMMAND_FOOTER = (
     "\n\n— — — — —\n"
-    f"🌐 See all your courses: {settings.public_base_url.rstrip('/')}/me\n"
-    "💬 *add <CRN>*  ·  *remove <CRN>*  ·  *stop*"
+    f"🔗 View & manage your courses:\n{settings.public_base_url.rstrip('/')}/me\n"
+    "(This number only sends alerts — no need to reply.)"
 )
 
 

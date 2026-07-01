@@ -422,90 +422,10 @@ async def whatsapp_webhook(request: Request):
     # configured, require it — blocks public spoofing of inbound messages.
     if settings.bridge_token and request.headers.get("x-bridge-token") != settings.bridge_token:
         raise HTTPException(status_code=403)
-    body = await request.json()
-    phone = normalize_phone(str(body.get("from", "")))
-    text = (body.get("text") or "").strip()
-    if not phone or not text:
-        return {"ok": True}
-
-    reply = _handle_command(phone, text)
-    if reply:
-        send_message(phone, reply)
+    # SEND-ONLY bot: it never reads or replies to inbound messages. Users manage
+    # everything (view / add / remove courses) on the /me web page. We accept the
+    # POST so the bridge doesn't error, then ignore it entirely.
     return {"ok": True}
-
-
-def _handle_command(phone: str, text: str) -> str | None:
-    low = text.lower().strip()
-    user = db.get_user(phone)
-
-    if not user:
-        # Policy: the bot ONLY messages numbers that exist in the database.
-        # An unregistered sender gets no reply at all (registration is web-only).
-        log.info("Ignoring inbound from unregistered number %s", phone)
-        return None
-
-    if low in ("stop", "unsubscribe", "pause"):
-        db.set_active(phone, False)
-        return "🔕 Paused. You won't get alerts. Reply 'start' to resume."
-    if low in ("start", "resume"):
-        db.set_active(phone, True)
-        return "🔔 Resumed — you'll be alerted when a seat opens."
-
-    if low in ("list", "courses", "status", "check", "seats", "available", "my courses"):
-        # Answer from the LAST stored check (courses.last_seats) — never a live
-        # Banner hit, so many users asking at once can't hammer the portal.
-        rows = db.watches_for_user(phone)
-        if not rows:
-            return "You're not tracking any courses. Send 'add <CRN>' to start."
-        lines = []
-        for r in rows:
-            seats = r["last_seats"]
-            title = r["title"] or f"CRN {r['crn']}"
-            if seats is None:
-                state = "⏳ checking…"
-            elif seats > 0:
-                state = f"✅ {seats} seat(s) open"
-            else:
-                state = "❌ full"
-            lines.append(f"• {r['crn']} — {title}: {state}")
-        return "📋 Your courses:\n" + "\n".join(lines)
-
-    # Remove: 'remove/stop/untrack/delete/drop <CRN> [more...]'
-    if re.match(r"^(remove|stop|untrack|delete|drop)\b", low):
-        crns = parse_crns(low)
-        if not crns:
-            return "Which course? e.g. 'remove 12345'."
-        for crn in crns:
-            db.remove_watch(phone, crn)
-        return f"🗑️ Stopped tracking: {', '.join(crns)}."
-
-    # Add: 'add/track <CRN>' or a bare CRN. Check Banner now so we confirm it
-    # exists, report current seats, and reject CRNs Banner can't read.
-    crns = parse_crns(low)
-    if crns:
-        client = BannerClient()
-        out = []
-        for crn in crns:
-            course = db.get_course(crn, settings.banner_term)
-            if course is not None and course["last_checked"] is not None:
-                seats, title = course["last_seats"], course["title"]
-            else:
-                info = client.get_seats(crn, settings.banner_term)
-                if info is None:
-                    out.append(f"⚠️ {crn} — couldn't read this CRN from Banner. Double-check the number.")
-                    continue
-                db.update_course(crn, settings.banner_term, info["seats"], title=info["title"],
-                                 wait_capacity=info["wait_capacity"], wait_count=info["wait_count"])
-                seats, title = info["seats"], info["title"]
-            db.add_watch(phone, crn, settings.banner_term)
-            label = title or f"CRN {crn}"
-            if seats and seats > 0:
-                out.append(f"✅ {crn} — {label}: {seats} seat(s) OPEN now!")
-            else:
-                out.append(f"➕ {crn} — {label}: full — I'll alert you the moment a seat opens.")
-        return "\n".join(out)
-
-    return "🤔 I didn't catch that — try one of these:"
 
 
 # -------------------------------------------------------------- system

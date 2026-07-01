@@ -109,14 +109,13 @@ sent.clear()
 poller.check_all()
 check("no re-alert while seat stays open", len(sent) == 0)
 
-# 4. Inbound WhatsApp commands.
-client.post("/webhook/whatsapp", json={"from": "201010101010", "text": "list"})
-client.post("/webhook/whatsapp", json={"from": "201010101010", "text": "stop 23456"})
-check("stop <crn> removed a watch", db.counts()["watches"] == 2)
-client.post("/webhook/whatsapp", json={"from": "201010101010", "text": "track 34567"})
-check("track <crn> added a watch", any(w["crn"] == "34567" for w in db.watches_for_user("201010101010")))
-unknown = client.post("/webhook/whatsapp", json={"from": "20999", "text": "hi"})
-check("unknown user handled gracefully", unknown.status_code == 200)
+# 4. Bot is SEND-ONLY: inbound messages are ignored — no reply, no state change.
+sent.clear()
+before_w = db.counts()["watches"]
+r = client.post("/webhook/whatsapp", json={"from": "201010101010", "text": "stop 23456"})
+check("webhook accepts inbound (200)", r.status_code == 200)
+check("send-only: inbound changes no state", db.counts()["watches"] == before_w)
+check("send-only: inbound triggers no reply", len(sent) == 0)
 
 # 5. Admin gating.
 check("admin wrong key -> 404", client.get("/admin/wrong").status_code == 404)
