@@ -33,7 +33,7 @@ db.init_db()
 sent: list[tuple[str, str]] = []
 
 
-def _fake_send(phone, msg):
+def _fake_send(phone, msg, footer=True):
     sent.append((phone, msg))
     return True
 

@@ -353,7 +353,9 @@ def _rate_limited_broadcast(message: str, batch: int = 5, gap_seconds: int = 60)
     phones = [u["phone"] for u in db.all_users() if u["active"]]
     log.info("Broadcast start: %d users, %d every %ds", len(phones), batch, gap_seconds)
     for i in range(0, len(phones), batch):
-        sent = sum(1 for p in phones[i:i + batch] if send_message(p, message))
+        # footer=False: a broadcast is a self-contained announcement (it already
+        # carries the /me link), so we don't append the command footer twice.
+        sent = sum(1 for p in phones[i:i + batch] if send_message(p, message, footer=False))
         log.info("Broadcast batch %d-%d: %d sent", i, i + batch, sent)
         if i + batch < len(phones):
             time.sleep(gap_seconds)
