@@ -21,3 +21,6 @@ node_modules/
 
 # OS
 .DS_Store
+
+# Handover doc — contains secrets, keep local only
+HANDOVER.md
