@@ -47,6 +47,13 @@
     .chip.wait{background:rgba(212,168,67,0.08);color:var(--gold)}
     .foot{text-align:center;margin-top:18px;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:3px;text-transform:uppercase;color:var(--dim)}
     a{color:var(--crimson);text-decoration:none}
+    .rm{background:rgba(248,113,113,0.12);color:#f87171;border:0;border-radius:8px;width:30px;height:30px;font-size:13px;cursor:pointer;flex-shrink:0}
+    .rm:hover{background:rgba(248,113,113,0.22)}
+    .addf{display:flex;gap:8px;margin:14px 0 12px}
+    .addf input{flex:1;min-width:0;padding:11px 13px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-radius:10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none}
+    .addf input:focus{border-color:rgba(212,168,67,0.3)}
+    .addf button{padding:0 18px;background:var(--crimson);color:#fff;border:0;border-radius:10px;font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600;cursor:pointer;white-space:nowrap}
+    .err{background:rgba(196,18,48,0.06);border:1px solid rgba(196,18,48,0.18);color:#ff9fb0;padding:10px 13px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;margin-bottom:12px;line-height:1.5}
   </style>
 </head>
 <body>
@@ -61,6 +68,7 @@
           <p class="sub">{% if not active %}⏸ alerts paused — reply *start* on WhatsApp{% else %}We're watching these for you 🔔{% endif %}</p>
         </div>
         <div class="line"></div>
+        {% if error %}<div class="err">{{ error }}</div>{% endif %}
         {% for c in courses %}
         <div class="course">
           <div class="top">
@@ -68,6 +76,11 @@
               <div class="crn">CRN {{ c.crn }}</div>
               <div class="title">{{ c.title }}</div>
             </div>
+            <form method="post" action="/me/remove" onsubmit="return confirm('Stop watching CRN {{ c.crn }}?')">
+              <input type="hidden" name="phone" value="{{ phone }}">
+              <input type="hidden" name="crn" value="{{ c.crn }}">
+              <button type="submit" class="rm" title="Remove">✕</button>
+            </form>
           </div>
           <div class="stats">
             {% if c.seats_open %}<span class="chip seat-open">🟢 {{ c.seat_state }}</span>
@@ -76,10 +89,14 @@
           </div>
         </div>
         {% endfor %}
-        {% if not courses %}<p class="note">You're not watching any courses yet.</p>{% endif %}
-        <a class="btn" href="{{ banner_url }}" target="_blank" rel="noopener" style="text-decoration:none">🎓 Go to AUC Banner — Browse & Register →</a>
-        <p class="note">🔔 No need to check — we message you the moment a seat opens.<br>
-          Add or remove courses on WhatsApp: <b>add 12345</b> · <b>remove 12345</b></p>
+        {% if not courses %}<p class="note">You're not watching any courses yet — add one below.</p>{% endif %}
+        <form method="post" action="/me/add" class="addf">
+          <input type="hidden" name="phone" value="{{ phone }}">
+          <input name="crn" inputmode="numeric" placeholder="Add a course — CRN (e.g. 12345)" required />
+          <button type="submit">+ Add</button>
+        </form>
+        <a class="btn" href="{{ banner_url }}" target="_blank" rel="noopener" style="text-decoration:none">🎓 Check on AUC Banner yourself →</a>
+        <p class="note">🔔 No need to keep checking — we message you the moment a seat opens.</p>
         <button class="btn" style="background:#1e3354;margin-top:10px" onclick="location.href='/me'">Look up another number</button>
       {% else %}
         <div class="hdr">

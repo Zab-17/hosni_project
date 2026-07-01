@@ -271,6 +271,29 @@ def register(
 
 # ---------------------------------------------- user "my courses" page
 
+def _banner_url() -> str:
+    return settings.banner_base_url.rstrip("/") + settings.banner_path_prefix + "/classSearch/classSearch"
+
+
+def _render_my_courses(request: Request, norm: str | None, error: str | None = None,
+                       status: int = 200):
+    """Render the /me results (course list + add/remove UI) for a phone."""
+    user = db.get_user(norm) if norm else None
+    if not user:
+        return templates.TemplateResponse(
+            request, "me.html",
+            {"done": False, "error": "No account found for that number. Register first at the sign-up page."},
+            status_code=404,
+        )
+    courses = [_course_view(r) for r in db.watches_for_user(norm)]
+    return templates.TemplateResponse(
+        request, "me.html",
+        {"done": True, "name": user["first_name"], "phone": norm, "courses": courses,
+         "active": bool(user["active"]), "banner_url": _banner_url(), "error": error},
+        status_code=status,
+    )
+
+
 @app.get("/me", response_class=HTMLResponse)
 def my_courses_page(request: Request):
     return templates.TemplateResponse(request, "me.html", {"done": False})
@@ -281,24 +304,41 @@ def my_courses(request: Request, phone: str = Form(...)):
     if _me_rate_limited(_client_ip(request)):
         return templates.TemplateResponse(
             request, "me.html",
-            {"done": False, "error": "Too many lookups — please wait a little."},
-            status_code=429,
-        )
+            {"done": False, "error": "Too many lookups — please wait a little."}, status_code=429)
+    return _render_my_courses(request, normalize_phone(phone))
+
+
+@app.post("/me/add", response_class=HTMLResponse)
+def me_add(request: Request, phone: str = Form(...), crn: str = Form(...)):
     norm = normalize_phone(phone)
-    user = db.get_user(norm) if norm else None
-    if not user:
+    if not (norm and db.get_user(norm)):
         return templates.TemplateResponse(
-            request, "me.html",
-            {"done": False, "error": "No account found for that number. Register first at the sign-up page."},
-            status_code=404,
-        )
-    courses = [_course_view(r) for r in db.watches_for_user(norm)]
-    banner_url = settings.banner_base_url.rstrip("/") + settings.banner_path_prefix + "/classSearch/classSearch"
-    return templates.TemplateResponse(
-        request, "me.html",
-        {"done": True, "name": user["first_name"], "courses": courses,
-         "active": bool(user["active"]), "banner_url": banner_url},
-    )
+            request, "me.html", {"done": False, "error": "No account found for that number."}, status_code=404)
+    if _me_rate_limited(_client_ip(request)):
+        return _render_my_courses(request, norm, error="Too many actions — wait a moment.")
+    error, client = None, BannerClient()
+    for c in parse_crns(crn):
+        course = db.get_course(c, settings.banner_term)
+        if course is not None and course["last_checked"] is not None:
+            db.add_watch(norm, c, settings.banner_term)
+        else:
+            info = client.get_seats(c, settings.banner_term)
+            if info is None:
+                error = f"Couldn't find CRN {c} in Banner — double-check the number."
+                continue
+            db.update_course(c, settings.banner_term, info["seats"], title=info["title"],
+                             wait_capacity=info["wait_capacity"], wait_count=info["wait_count"])
+            db.add_watch(norm, c, settings.banner_term)
+    return _render_my_courses(request, norm, error=error)
+
+
+@app.post("/me/remove", response_class=HTMLResponse)
+def me_remove(request: Request, phone: str = Form(...), crn: str = Form(...)):
+    norm = normalize_phone(phone)
+    if norm and db.get_user(norm):
+        for c in parse_crns(crn):
+            db.remove_watch(norm, c)
+    return _render_my_courses(request, norm)
 
 
 # ---------------------------------------------------------- admin page
