@@ -51,7 +51,7 @@ class FakeBanner:
         if crn not in SEATS:
             return None
         return {"seats": SEATS[crn], "max": 30, "enrolled": 30 - SEATS[crn],
-                "title": f"COURSE {crn}"}
+                "title": f"COURSE {crn}", "wait_capacity": 15, "wait_count": 3}
 
 
 poller.BannerClient = FakeBanner

@@ -47,6 +47,8 @@ def init_db() -> None:
                 title        TEXT,
                 last_seats   INTEGER,
                 last_checked TEXT,
+                last_wait_capacity INTEGER,
+                last_wait_count    INTEGER,
                 PRIMARY KEY (crn, term)
             )"""
         )
@@ -59,6 +61,12 @@ def init_db() -> None:
                 PRIMARY KEY (phone, crn, term)
             )"""
         )
+        # Idempotent migrations for existing databases (columns added later).
+        for col in ("last_wait_capacity INTEGER", "last_wait_count INTEGER"):
+            try:
+                c.execute(f"ALTER TABLE courses ADD COLUMN {col}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
         c.commit()
 
 
@@ -113,18 +121,19 @@ def ensure_course(crn: str, term: str) -> None:
         c.commit()
 
 
-def update_course(crn: str, term: str, seats: int, title: str | None = None) -> None:
+def update_course(crn: str, term: str, seats: int, title: str | None = None,
+                  wait_capacity: int | None = None, wait_count: int | None = None) -> None:
     with _lock, _connect() as c:
+        sets = ["last_seats=?", "last_checked=?"]
+        vals: list = [seats, _now()]
         if title:
-            c.execute(
-                "UPDATE courses SET last_seats=?, last_checked=?, title=? WHERE crn=? AND term=?",
-                (seats, _now(), title, crn, term),
-            )
-        else:
-            c.execute(
-                "UPDATE courses SET last_seats=?, last_checked=? WHERE crn=? AND term=?",
-                (seats, _now(), crn, term),
-            )
+            sets.append("title=?"); vals.append(title)
+        if wait_capacity is not None:
+            sets.append("last_wait_capacity=?"); vals.append(wait_capacity)
+        if wait_count is not None:
+            sets.append("last_wait_count=?"); vals.append(wait_count)
+        vals += [crn, term]
+        c.execute(f"UPDATE courses SET {', '.join(sets)} WHERE crn=? AND term=?", vals)
         c.commit()
 
 
@@ -192,7 +201,8 @@ def remove_watch(phone: str, crn: str, term: str | None = None) -> None:
 def watches_for_user(phone: str) -> list[sqlite3.Row]:
     with _connect() as c:
         return c.execute(
-            """SELECT w.crn, w.term, c.title, c.last_seats, c.last_checked
+            """SELECT w.crn, w.term, c.title, c.last_seats, c.last_checked,
+                      c.last_wait_capacity, c.last_wait_count
                FROM watch w LEFT JOIN courses c
                  ON c.crn=w.crn AND c.term=w.term
                WHERE w.phone=? ORDER BY w.crn""",

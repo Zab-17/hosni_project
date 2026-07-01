@@ -102,6 +102,45 @@ def _rate_limited(ip: str) -> bool:
     return False
 
 
+# Separate, looser limit for the /me lookup page (30/hour per IP).
+_me_hits: dict[str, list[float]] = defaultdict(list)
+
+
+def _me_rate_limited(ip: str) -> bool:
+    now = time.time()
+    hits = [t for t in _me_hits[ip] if now - t < 3600]
+    _me_hits[ip] = hits
+    if len(hits) >= 30:
+        return True
+    hits.append(now)
+    return False
+
+
+def _course_view(r) -> dict:
+    """Build the display row for a watched course: seat status + waitlist as
+    'open out of total'."""
+    seats, cap, cnt = r["last_seats"], r["last_wait_capacity"], r["last_wait_count"]
+    if seats is None:
+        seat_state = "checking…"
+    elif seats > 0:
+        seat_state = f"{seats} open"
+    else:
+        seat_state = "full"
+    if cap and cap > 0:
+        wait_state = f"{cap - (cnt or 0)} out of {cap}"
+    elif cap == 0:
+        wait_state = "no waitlist"
+    else:
+        wait_state = "—"
+    return {
+        "crn": r["crn"],
+        "title": r["title"] or f"CRN {r['crn']}",
+        "seats_open": (seats or 0) > 0,
+        "seat_state": seat_state,
+        "wait_state": wait_state,
+    }
+
+
 def _finish_registration(phone: str, name: str, crns: list[str], term: str) -> None:
     """Runs after the page returns: populate seats for the new courses, then
     confirm on WhatsApp (so the confirmation shows current availability)."""
@@ -227,6 +266,36 @@ def register(
             "name": fn,
             "crns": crn_list,
         },
+    )
+
+
+# ---------------------------------------------- user "my courses" page
+
+@app.get("/me", response_class=HTMLResponse)
+def my_courses_page(request: Request):
+    return templates.TemplateResponse(request, "me.html", {"done": False})
+
+
+@app.post("/me", response_class=HTMLResponse)
+def my_courses(request: Request, phone: str = Form(...)):
+    if _me_rate_limited(_client_ip(request)):
+        return templates.TemplateResponse(
+            request, "me.html",
+            {"done": False, "error": "Too many lookups — please wait a little."},
+            status_code=429,
+        )
+    norm = normalize_phone(phone)
+    user = db.get_user(norm) if norm else None
+    if not user:
+        return templates.TemplateResponse(
+            request, "me.html",
+            {"done": False, "error": "No account found for that number. Register first at the sign-up page."},
+            status_code=404,
+        )
+    courses = [_course_view(r) for r in db.watches_for_user(norm)]
+    return templates.TemplateResponse(
+        request, "me.html",
+        {"done": True, "name": user["first_name"], "courses": courses, "active": bool(user["active"])},
     )
 
 
@@ -387,7 +456,8 @@ def _handle_command(phone: str, text: str) -> str | None:
                 if info is None:
                     out.append(f"⚠️ {crn} — couldn't read this CRN from Banner. Double-check the number.")
                     continue
-                db.update_course(crn, settings.banner_term, info["seats"], title=info["title"])
+                db.update_course(crn, settings.banner_term, info["seats"], title=info["title"],
+                                 wait_capacity=info["wait_capacity"], wait_count=info["wait_count"])
                 seats, title = info["seats"], info["title"]
             db.add_watch(phone, crn, settings.banner_term)
             label = title or f"CRN {crn}"

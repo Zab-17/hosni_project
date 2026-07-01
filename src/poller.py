@@ -49,7 +49,8 @@ def check_courses(crns: list[str], term: str) -> None:
             continue
         info = client.get_seats(crn, term)
         if info:
-            db.update_course(crn, term, info["seats"], title=info["title"])
+            db.update_course(crn, term, info["seats"], title=info["title"],
+                             wait_capacity=info["wait_capacity"], wait_count=info["wait_count"])
             log.info("Immediate check CRN %s: %d seats available", crn, info["seats"])
 
 
@@ -71,7 +72,8 @@ def check_all() -> None:
             continue
         checked += 1
         seats = info["seats"]
-        db.update_course(crn, term, seats, title=info["title"])
+        db.update_course(crn, term, seats, title=info["title"],
+                         wait_capacity=info["wait_capacity"], wait_count=info["wait_count"])
 
         if seats > 0 and (prev is None or prev == 0):
             alerts += _notify(crn, term, info)

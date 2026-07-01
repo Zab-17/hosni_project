@@ -95,6 +95,10 @@ class BannerClient:
                     "max": int(item.get("maximumEnrollment") or 0),
                     "enrolled": int(item.get("enrollment") or 0),
                     "title": label,
+                    # Waitlist: capacity = total size, count = people on it.
+                    # Open spots = capacity - count.
+                    "wait_capacity": int(item.get("waitCapacity") or 0),
+                    "wait_count": int(item.get("waitCount") or 0),
                 }
         return None  # CRN not found in this term
 
