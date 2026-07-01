@@ -61,6 +61,14 @@ def init_db() -> None:
                 PRIMARY KEY (phone, crn, term)
             )"""
         )
+        # key/value store — used for the latest broadcast announcement.
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS meta (
+                key        TEXT PRIMARY KEY,
+                value      TEXT,
+                updated_at TEXT
+            )"""
+        )
         # Idempotent migrations for existing databases (columns added later).
         for col in ("last_wait_capacity INTEGER", "last_wait_count INTEGER"):
             try:
@@ -68,6 +76,22 @@ def init_db() -> None:
             except sqlite3.OperationalError:
                 pass  # column already exists
         c.commit()
+
+
+def set_announcement(text: str) -> None:
+    with _lock, _connect() as c:
+        c.execute(
+            """INSERT INTO meta (key, value, updated_at) VALUES ('announcement', ?, ?)
+               ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at""",
+            (text, _now()),
+        )
+        c.commit()
+
+
+def get_announcement():
+    """Returns {'value', 'updated_at'} or None."""
+    with _connect() as c:
+        return c.execute("SELECT value, updated_at FROM meta WHERE key='announcement'").fetchone()
 
 
 # ---------------------------------------------------------------- users

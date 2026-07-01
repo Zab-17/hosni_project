@@ -282,21 +282,24 @@ def _render_my_courses(request: Request, norm: str | None, error: str | None = N
     if not user:
         return templates.TemplateResponse(
             request, "me.html",
-            {"done": False, "error": "No account found for that number. Register first at the sign-up page."},
+            {"done": False, "announcement": db.get_announcement(),
+             "error": "No account found for that number. Register first at the sign-up page."},
             status_code=404,
         )
     courses = [_course_view(r) for r in db.watches_for_user(norm)]
     return templates.TemplateResponse(
         request, "me.html",
         {"done": True, "name": user["first_name"], "phone": norm, "courses": courses,
-         "active": bool(user["active"]), "banner_url": _banner_url(), "error": error},
+         "active": bool(user["active"]), "banner_url": _banner_url(),
+         "announcement": db.get_announcement(), "error": error},
         status_code=status,
     )
 
 
 @app.get("/me", response_class=HTMLResponse)
 def my_courses_page(request: Request):
-    return templates.TemplateResponse(request, "me.html", {"done": False})
+    return templates.TemplateResponse(
+        request, "me.html", {"done": False, "announcement": db.get_announcement()})
 
 
 @app.post("/me", response_class=HTMLResponse)
@@ -310,12 +313,15 @@ def my_courses(request: Request, phone: str = Form(...)):
 
 @app.post("/me/add", response_class=HTMLResponse)
 def me_add(request: Request, phone: str = Form(...), crn: str = Form(...)):
+    # Rate-limit FIRST (before any DB/Banner work) so this can't be used to
+    # enumerate registered numbers or hammer Banner.
+    if _me_rate_limited(_client_ip(request)):
+        return templates.TemplateResponse(
+            request, "me.html", {"done": False, "error": "Too many actions — wait a moment."}, status_code=429)
     norm = normalize_phone(phone)
     if not (norm and db.get_user(norm)):
         return templates.TemplateResponse(
             request, "me.html", {"done": False, "error": "No account found for that number."}, status_code=404)
-    if _me_rate_limited(_client_ip(request)):
-        return _render_my_courses(request, norm, error="Too many actions — wait a moment.")
     error, client = None, BannerClient()
     for c in parse_crns(crn):
         course = db.get_course(c, settings.banner_term)
@@ -334,6 +340,9 @@ def me_add(request: Request, phone: str = Form(...), crn: str = Form(...)):
 
 @app.post("/me/remove", response_class=HTMLResponse)
 def me_remove(request: Request, phone: str = Form(...), crn: str = Form(...)):
+    if _me_rate_limited(_client_ip(request)):
+        return templates.TemplateResponse(
+            request, "me.html", {"done": False, "error": "Too many actions — wait a moment."}, status_code=429)
     norm = normalize_phone(phone)
     if norm and db.get_user(norm):
         for c in parse_crns(crn):
@@ -389,27 +398,12 @@ def admin_remove_course(key: str, crn: str = Form(...)):
     return RedirectResponse(f"/admin/{key}", status_code=303)
 
 
-def _rate_limited_broadcast(message: str, batch: int = 5, gap_seconds: int = 60) -> None:
-    """Send a broadcast in small batches (default 5 per minute) so a freshly-
-    linked WhatsApp number doesn't trip spam detection and get banned."""
-    phones = [u["phone"] for u in db.all_users() if u["active"]]
-    log.info("Broadcast start: %d users, %d every %ds", len(phones), batch, gap_seconds)
-    for i in range(0, len(phones), batch):
-        # footer=False: a broadcast is a self-contained announcement (it already
-        # carries the /me link), so we don't append the command footer twice.
-        sent = sum(1 for p in phones[i:i + batch] if send_message(p, message, footer=False))
-        log.info("Broadcast batch %d-%d: %d sent", i, i + batch, sent)
-        if i + batch < len(phones):
-            time.sleep(gap_seconds)
-    log.info("Broadcast complete: %d users", len(phones))
-
-
 @app.post("/admin/{key}/broadcast")
 def admin_broadcast(key: str, message: str = Form(...)):
     _check_admin(key)
-    # Run as a background scheduler job (5/min) so the request returns instantly
-    # and the paced sending survives outside the HTTP request lifetime.
-    scheduler.add_job(_rate_limited_broadcast, args=[message], id="broadcast", replace_existing=True)
+    # No WhatsApp mass-send (that's what got numbers banned). The announcement is
+    # SAVED and shown to every user on the /me page instead.
+    db.set_announcement(message.strip())
     return RedirectResponse(f"/admin/{key}", status_code=303)
 
 

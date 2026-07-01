@@ -6,54 +6,85 @@
   <title>My Courses · AUC Seat Watcher</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    :root{--navy:#041631;--surface:rgba(6,20,42,0.65);--crimson:#c41230;--gold:#d4a843;--text:#dfe6f0;--mid:#6e83a3;--dim:#34506e;--green:#2fbf71}
+    :root{
+      --navy:#041631; --surface:rgba(9,24,48,0.78); --crimson:#e11d48; --crimson-2:#c41230;
+      --gold:#e2b64a; --text:#eef3fa; --mid:#aebbd2; --dim:#7488a6; --green:#3ad07f;
+    }
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{min-height:100%}
-    body{font-family:'Cormorant Garamond',serif;background:var(--navy);color:var(--text);display:flex;align-items:center;justify-content:center;padding:24px 0;overflow-x:hidden}
+    body{font-family:'Inter',system-ui,sans-serif;background:var(--navy);color:var(--text);
+         display:flex;align-items:center;justify-content:center;padding:24px 0;overflow-x:hidden;
+         -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
     .bg{position:fixed;inset:0;z-index:0;overflow:hidden}
-    .bg .orb{position:absolute;border-radius:50%;filter:blur(120px);opacity:.35;animation:drift 24s ease-in-out infinite alternate}
+    .bg .orb{position:absolute;border-radius:50%;filter:blur(120px);opacity:.32;animation:drift 24s ease-in-out infinite alternate}
     .bg .orb:nth-child(1){width:600px;height:600px;background:var(--crimson);top:-200px;right:-150px}
     .bg .orb:nth-child(2){width:500px;height:500px;background:#1a3a7a;bottom:-220px;left:-120px;animation-duration:32s}
     @keyframes drift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-20px) scale(1.03)}100%{transform:translate(-20px,30px) scale(.97)}}
-    .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.25;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")}
-    .wrap{position:relative;z-index:2;width:100%;max-width:460px;padding:16px}
-    .card{background:var(--surface);border:1px solid rgba(255,255,255,0.04);border-radius:20px;padding:28px;backdrop-filter:blur(60px);-webkit-backdrop-filter:blur(60px);box-shadow:0 1px 0 rgba(255,255,255,0.03) inset,0 40px 80px -20px rgba(0,0,0,0.5);animation:appear 1s cubic-bezier(.16,1,.3,1) both}
-    @keyframes appear{from{opacity:0;transform:translateY(30px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-    .hdr{text-align:center;margin-bottom:18px}
-    .badge{display:inline-block;padding:3px 14px;border:1px solid rgba(212,168,67,0.2);border-radius:100px;font-family:'DM Mono',monospace;font-size:9px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:14px}
-    h1{font-size:26px;font-weight:300;letter-spacing:-.5px}
-    h1 em{font-style:italic;font-weight:600;color:var(--crimson)}
-    .sub{color:var(--mid);font-family:'DM Mono',monospace;font-size:11px;font-weight:300;margin-top:8px;letter-spacing:.5px}
-    .line{height:1px;margin:18px 0;background:linear-gradient(90deg,transparent,rgba(196,18,48,0.12),transparent)}
-    .f label{display:block;font-family:'DM Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
-    .f input{width:100%;padding:12px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-radius:10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;transition:all .3s}
-    .f input:focus{border-color:rgba(212,168,67,0.3);background:rgba(212,168,67,0.03);box-shadow:0 0 0 3px rgba(212,168,67,0.04)}
-    .fh{font-family:'DM Mono',monospace;font-size:9px;color:var(--dim);margin-top:5px;letter-spacing:.2px}
-    .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:16px;padding:13px 24px;background:var(--crimson);color:#fff;border:none;border-radius:10px;font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600;cursor:pointer;transition:all .4s cubic-bezier(.16,1,.3,1)}
-    .btn:hover{transform:translateY(-1px);box-shadow:0 10px 30px -8px rgba(196,18,48,0.4)}
-    .err{background:rgba(196,18,48,0.06);border:1px solid rgba(196,18,48,0.18);color:#ff9fb0;padding:11px 13px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;margin-bottom:14px;line-height:1.5}
-    .note{font-family:'DM Mono',monospace;font-size:10px;color:var(--mid);line-height:1.7;margin-top:16px;text-align:center}
+    .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.18;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")}
+    .wrap{position:relative;z-index:2;width:100%;max-width:470px;padding:16px}
+    .card{background:var(--surface);border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:26px;
+          backdrop-filter:blur(50px);-webkit-backdrop-filter:blur(50px);
+          box-shadow:0 1px 0 rgba(255,255,255,0.04) inset,0 40px 80px -20px rgba(0,0,0,0.55);
+          animation:appear .8s cubic-bezier(.16,1,.3,1) both}
+    @keyframes appear{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+
+    /* announcement banner */
+    .announce{background:linear-gradient(135deg,rgba(226,182,74,0.14),rgba(225,29,72,0.10));
+              border:1px solid rgba(226,182,74,0.28);border-radius:14px;padding:14px 16px;margin-bottom:18px}
+    .announce .tag{font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--gold);text-transform:uppercase;margin-bottom:6px}
+    .announce .body{font-size:14px;font-weight:500;line-height:1.55;color:#f4f7fc;white-space:pre-wrap;word-break:break-word}
+
+    .hdr{text-align:center;margin-bottom:16px}
+    .badge{display:inline-block;padding:4px 14px;border:1px solid rgba(226,182,74,0.3);border-radius:100px;
+           font-size:10px;font-weight:700;color:var(--gold);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px}
+    h1{font-size:26px;font-weight:800;letter-spacing:-.4px;line-height:1.15}
+    h1 em{font-style:normal;color:var(--crimson)}
+    .sub{color:var(--mid);font-size:14px;font-weight:500;margin-top:8px;line-height:1.4}
+    .line{height:1px;margin:16px 0;background:linear-gradient(90deg,transparent,rgba(226,182,74,0.22),transparent)}
+
+    .f label{display:block;font-size:11px;font-weight:600;color:var(--mid);letter-spacing:1px;text-transform:uppercase;margin-bottom:7px}
+    .f input{width:100%;padding:13px 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);
+             border-radius:11px;color:var(--text);font-family:inherit;font-size:15px;font-weight:500;outline:none;transition:all .25s}
+    .f input::placeholder{color:var(--dim);font-weight:400}
+    .f input:focus{border-color:rgba(226,182,74,0.45);background:rgba(226,182,74,0.06);box-shadow:0 0 0 3px rgba(226,182,74,0.08)}
+    .fh{font-size:12px;font-weight:500;color:var(--dim);margin-top:6px;line-height:1.5}
+
+    .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:14px;padding:14px 22px;
+         background:var(--crimson);color:#fff;border:none;border-radius:11px;font-family:inherit;font-size:15px;
+         font-weight:700;cursor:pointer;transition:all .3s cubic-bezier(.16,1,.3,1);text-decoration:none}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 12px 30px -8px rgba(225,29,72,0.45)}
+    .btn.ghost{background:rgba(255,255,255,0.07)}
+    .btn.ghost:hover{background:rgba(255,255,255,0.12);box-shadow:none}
+    .btn.gold{background:rgba(226,182,74,0.16);color:var(--gold);border:1px solid rgba(226,182,74,0.35)}
+    .btn.gold:hover{background:rgba(226,182,74,0.24);box-shadow:none}
+
+    .err{background:rgba(225,29,72,0.10);border:1px solid rgba(225,29,72,0.3);color:#ffb3c2;
+         padding:11px 14px;border-radius:11px;font-size:13px;font-weight:500;margin-bottom:14px;line-height:1.45}
+
     /* course cards */
-    .course{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px;padding:13px 15px;margin-bottom:10px}
-    .course .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-    .course .crn{font-family:'DM Mono',monospace;font-size:13px;color:var(--gold);letter-spacing:1px}
-    .course .title{font-size:15px;color:var(--text);margin-top:2px;line-height:1.25}
-    .stats{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
-    .chip{font-family:'DM Mono',monospace;font-size:10px;padding:4px 10px;border-radius:8px;letter-spacing:.3px}
-    .chip.seat-open{background:rgba(47,191,113,0.12);color:var(--green)}
-    .chip.seat-full{background:rgba(255,255,255,0.05);color:var(--mid)}
-    .chip.wait{background:rgba(212,168,67,0.08);color:var(--gold)}
-    .foot{text-align:center;margin-top:18px;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:3px;text-transform:uppercase;color:var(--dim)}
-    a{color:var(--crimson);text-decoration:none}
-    .rm{background:rgba(248,113,113,0.12);color:#f87171;border:0;border-radius:8px;width:30px;height:30px;font-size:13px;cursor:pointer;flex-shrink:0}
-    .rm:hover{background:rgba(248,113,113,0.22)}
+    .course{background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.07);border-radius:13px;padding:14px 16px;margin-bottom:10px}
+    .course .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .course .crn{font-size:13px;font-weight:700;color:var(--gold);letter-spacing:.5px}
+    .course .title{font-size:15px;font-weight:600;color:var(--text);margin-top:3px;line-height:1.3}
+    .stats{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
+    .chip{font-size:12px;font-weight:600;padding:5px 11px;border-radius:8px;letter-spacing:.2px}
+    .chip.seat-open{background:rgba(58,208,127,0.16);color:var(--green)}
+    .chip.seat-full{background:rgba(255,255,255,0.06);color:var(--mid)}
+    .chip.wait{background:rgba(226,182,74,0.12);color:var(--gold)}
+    .rm{background:rgba(225,29,72,0.14);color:#ff8098;border:0;border-radius:9px;width:32px;height:32px;
+        font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0}
+    .rm:hover{background:rgba(225,29,72,0.24)}
     .addf{display:flex;gap:8px;margin:14px 0 12px}
-    .addf input{flex:1;min-width:0;padding:11px 13px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-radius:10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none}
-    .addf input:focus{border-color:rgba(212,168,67,0.3)}
-    .addf button{padding:0 18px;background:var(--crimson);color:#fff;border:0;border-radius:10px;font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600;cursor:pointer;white-space:nowrap}
-    .err{background:rgba(196,18,48,0.06);border:1px solid rgba(196,18,48,0.18);color:#ff9fb0;padding:10px 13px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;margin-bottom:12px;line-height:1.5}
+    .addf input{flex:1;min-width:0;padding:12px 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);
+                border-radius:11px;color:var(--text);font-family:inherit;font-size:14px;font-weight:500;outline:none}
+    .addf input:focus{border-color:rgba(226,182,74,0.45)}
+    .addf button{padding:0 20px;background:var(--crimson);color:#fff;border:0;border-radius:11px;font-family:inherit;
+                 font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap}
+    .note{font-size:13px;font-weight:500;color:var(--mid);line-height:1.6;margin-top:14px;text-align:center}
+    .foot{text-align:center;margin-top:16px;font-size:13px;font-weight:500;color:var(--mid)}
+    a{color:var(--crimson);text-decoration:none;font-weight:600}
   </style>
 </head>
 <body>
@@ -61,13 +92,22 @@
   <div class="grain"></div>
   <div class="wrap">
     <div class="card">
+
+      {% if announcement %}
+      <div class="announce">
+        <div class="tag">📢 Latest update</div>
+        <div class="body">{{ announcement.value }}</div>
+      </div>
+      {% endif %}
+
       {% if done %}
         <div class="hdr">
           <span class="badge">Your courses</span>
           <h1>Hi, <em>{{ name }}</em></h1>
-          <p class="sub">{% if not active %}⏸ alerts paused — reply *start* on WhatsApp{% else %}We're watching these for you 🔔{% endif %}</p>
+          <p class="sub">{% if not active %}⏸ Alerts paused — reply <b>start</b> on WhatsApp{% else %}We're watching these for you 🔔{% endif %}</p>
         </div>
         <div class="line"></div>
+
         {% if error %}<div class="err">{{ error }}</div>{% endif %}
         {% for c in courses %}
         <div class="course">
@@ -90,21 +130,24 @@
         </div>
         {% endfor %}
         {% if not courses %}<p class="note">You're not watching any courses yet — add one below.</p>{% endif %}
+
         <form method="post" action="/me/add" class="addf">
           <input type="hidden" name="phone" value="{{ phone }}">
           <input name="crn" inputmode="numeric" placeholder="Add a course — CRN (e.g. 12345)" required />
           <button type="submit">+ Add</button>
         </form>
-        <a class="btn" href="{{ banner_url }}" target="_blank" rel="noopener" style="text-decoration:none">🎓 Check on AUC Banner yourself →</a>
-        <p class="note">🔔 No need to keep checking — we message you the moment a seat opens.</p>
-        <button class="btn" style="background:#1e3354;margin-top:10px" onclick="location.href='/me'">Look up another number</button>
+
+        <a class="btn gold" href="{{ banner_url }}" target="_blank" rel="noopener">🎓 Check on AUC Banner yourself →</a>
+        <p class="note">🔔 No need to keep checking — the WhatsApp bot only exists to <b>alert you</b>. Please don't message it. The moment a seat opens, we send you here.</p>
+        <button class="btn ghost" onclick="location.href='/me'">Look up another number</button>
       {% else %}
         <div class="hdr">
           <span class="badge">AUC · Seat Watcher</span>
           <h1>See <em>your</em> courses</h1>
-          <p class="sub">Enter your WhatsApp number to view what we're watching</p>
+          <p class="sub">Enter your WhatsApp number to view what we're watching, and add or remove courses.</p>
         </div>
         <div class="line"></div>
+
         {% if error %}<div class="err">{{ error }}</div>{% endif %}
         <form method="post" action="/me">
           <div class="f">
@@ -114,7 +157,7 @@
           </div>
           <button class="btn" type="submit">View my courses →</button>
         </form>
-        <p class="foot">Not registered? <a href="/">Sign up here</a></p>
+        <a class="btn gold" href="/">✨ New here? Sign up →</a>
       {% endif %}
     </div>
   </div>

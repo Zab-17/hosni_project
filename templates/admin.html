@@ -133,11 +133,10 @@
         <div class="fld"><label>Remove CRN (everyone)</label><input name="crn" placeholder="17432" required /></div>
         <button class="danger" type="submit">Remove course</button>
       </form>
-      <form method="post" action="/admin/{{ key }}/broadcast" style="margin-top:14px"
-            onsubmit="return confirm('Send this message to ALL active users?')">
-        <label class="sub">Broadcast a WhatsApp message to every active user</label><br>
-        <textarea name="message" rows="2" style="width:100%;margin-top:6px" required placeholder="Heads up: …"></textarea>
-        <button type="submit" style="margin-top:8px">Broadcast</button>
+      <form method="post" action="/admin/{{ key }}/broadcast" style="margin-top:14px">
+        <label class="sub">Post an announcement — shown to every user on the <b>/me</b> page (NOT sent on WhatsApp)</label><br>
+        <textarea name="message" rows="3" style="width:100%;margin-top:6px" required placeholder="📢 Heads up: …"></textarea>
+        <button type="submit" style="margin-top:8px">Publish announcement</button>
       </form>
     </section>
   </div>
