@@ -142,13 +142,17 @@ async function connectToWhatsApp() {
             isReconnecting = false; // release lock so reconnect can proceed
             disconnectedSince = disconnectedSince || Date.now();
             const statusCode = (lastDisconnect?.error)?.output?.statusCode;
-            const loggedOut = statusCode === DisconnectReason.loggedOut;
-            console.log('Connection closed. Status:', statusCode, '| LoggedOut:', loggedOut);
+            // 401 = logged out, 403 = forbidden/banned. Both mean the saved creds
+            // are dead and only a fresh QR (new number) can recover — so wipe + re-QR.
+            const loggedOut = statusCode === DisconnectReason.loggedOut
+                || statusCode === DisconnectReason.forbidden
+                || statusCode === 403;
+            console.log('Connection closed. Status:', statusCode, '| LoggedOut/banned:', loggedOut);
 
             if (loggedOut) {
                 // Saved creds are now invalid. Without wiping them, every reconnect
-                // loops back to loggedOut and the bridge sits dead waiting for a human.
-                console.error('CRITICAL: WhatsApp session logged out. Wiping creds for fresh QR.');
+                // loops back and the bridge sits dead waiting for a human.
+                console.error('CRITICAL: WhatsApp session dead (logout/ban). Wiping creds for fresh QR.');
                 wipeAuthDir();
                 reconnectAttempts = 0;
                 qrCode = null;
